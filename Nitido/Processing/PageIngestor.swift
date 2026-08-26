@@ -11,6 +11,29 @@ struct PageRecord: Sendable, Equatable {
     let originalFileName: String
     let processedFileName: String
     let thumbnailFileName: String
+    let filter: PageFilter
+    let documentEnhancementIntensity: Double
+    let quad: QuadPoints?
+
+    init(
+        pageID: UUID,
+        index: Int,
+        originalFileName: String,
+        processedFileName: String,
+        thumbnailFileName: String,
+        filter: PageFilter = .original,
+        documentEnhancementIntensity: Double = 1,
+        quad: QuadPoints? = nil
+    ) {
+        self.pageID = pageID
+        self.index = index
+        self.originalFileName = originalFileName
+        self.processedFileName = processedFileName
+        self.thumbnailFileName = thumbnailFileName
+        self.filter = filter
+        self.documentEnhancementIntensity = documentEnhancementIntensity
+        self.quad = quad
+    }
 }
 
 /// Escribe en disco las tres variantes de cada página.
@@ -29,6 +52,8 @@ struct PageIngestor: Sendable {
         _ images: [SendableImage],
         documentID: UUID,
         startingIndex: Int = 0,
+        detectedQuads: [QuadPoints?] = [],
+        normalizedImages: [CGImage?] = [],
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) throws -> [PageRecord] {
         try fileStore.createDocumentDirectory(for: documentID)
@@ -41,7 +66,13 @@ struct PageIngestor: Sendable {
             // iPhone reciente son varios megapíxeles y, sin esto, procesar una
             // tanda de diez páginas mantiene las diez vivas hasta el final.
             let record = try autoreleasepool {
-                try ingestOne(image, documentID: documentID, index: startingIndex + offset)
+                try ingestOne(
+                    image,
+                    documentID: documentID,
+                    index: startingIndex + offset,
+                    detectedQuad: detectedQuads[safe: offset] ?? nil,
+                    normalized: normalizedImages[safe: offset] ?? nil
+                )
             }
             records.append(record)
             onProgress?(offset + 1, images.count)
@@ -53,10 +84,12 @@ struct PageIngestor: Sendable {
     private func ingestOne(
         _ image: SendableImage,
         documentID: UUID,
-        index: Int
+        index: Int,
+        detectedQuad: QuadPoints?,
+        normalized precomputedNormalized: CGImage? = nil
     ) throws -> PageRecord {
         let pageID = UUID()
-        let normalized = ImageProcessor.normalized(image)
+        let normalized = precomputedNormalized ?? ImageProcessor.normalized(image)
 
         // 1. Original tal cual, en HEIC si el dispositivo lo acepta.
         let original = try ImageProcessor.encodeOriginal(normalized)
@@ -65,11 +98,28 @@ struct PageIngestor: Sendable {
         )
         try fileStore.write(original.data, fileName: originalName, documentID: documentID)
 
-        // 2. Procesado. En la Sprint 1 es el original recodificado a JPEG: la
-        //    corrección de perspectiva y el recorte ya vienen hechos de
-        //    VisionKit. Los filtros entran aquí en la Sprint 2, siempre de
-        //    forma no destructiva sobre el original, que no se toca nunca.
-        let processedData = try ImageProcessor.encodeProcessed(normalized)
+        // 2. Procesado derivado del original. VisionKit ya entrega la captura
+        //    recortada; Fotos y Archivos llegan con un cuadrilátero detectado
+        //    y el filtro Documento, siempre sin tocar el fichero original.
+        let usableQuad = detectedQuad.flatMap { $0.isValidForEditing ? $0 : nil }
+        var configuration = PageEditConfiguration(
+            filter: usableQuad == nil ? .original : .document,
+            documentEnhancementIntensity: 1,
+            quad: usableQuad ?? .full
+        )
+        let processedImage: CGImage
+        if configuration.filter == .original, configuration.quad.isFullImage {
+            processedImage = normalized
+        } else if let rendered = try? PageRenderer.fullResolution(normalized, configuration: configuration) {
+            processedImage = rendered
+        } else {
+            // El recorte/filtro detectado no se pudo renderizar (p.ej. cuadrilátero
+            // degenerado): no por eso se descarta la página entera, se importa sin
+            // recortar como antes de tener detección.
+            configuration = PageEditConfiguration(filter: .original, documentEnhancementIntensity: 1, quad: .full)
+            processedImage = normalized
+        }
+        let processedData = try ImageProcessor.encodeProcessed(processedImage)
         let processedName = fileStore.fileName(
             for: .processed, pageID: pageID, fileExtension: "jpg"
         )
@@ -94,7 +144,16 @@ struct PageIngestor: Sendable {
             index: index,
             originalFileName: originalName,
             processedFileName: processedName,
-            thumbnailFileName: thumbnailName
+            thumbnailFileName: thumbnailName,
+            filter: configuration.filter,
+            documentEnhancementIntensity: configuration.documentEnhancementIntensity,
+            quad: configuration.filter == .original ? nil : usableQuad
         )
+    }
+}
+
+private extension Collection {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

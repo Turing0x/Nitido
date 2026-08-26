@@ -5,6 +5,14 @@ enum DocumentStoreError: Error {
     case documentNotFound(UUID)
 }
 
+/// Datos de archivo que el coordinador puede usar fuera del actor sin mover
+/// modelos SwiftData entre hilos.
+struct PageAssetInfo: Sendable, Equatable {
+    let originalFileName: String
+    let processedFileName: String
+    let thumbnailFileName: String
+}
+
 /// Escrituras de SwiftData fuera del hilo principal.
 ///
 /// `@ModelActor` da un ejecutor propio y un `ModelContext` atado a él. Todo lo
@@ -40,6 +48,65 @@ actor DocumentStore {
         }
         document.updatedAt = .now
         try modelContext.save()
+    }
+
+    func pageAssetInfo(pageID: UUID, in documentID: UUID) throws -> PageAssetInfo {
+        let page = try fetchPage(pageID, in: documentID)
+        return PageAssetInfo(
+            originalFileName: page.originalFileName,
+            processedFileName: page.processedFileName,
+            thumbnailFileName: page.thumbnailFileName
+        )
+    }
+
+    func updatePage(
+        _ pageID: UUID,
+        in documentID: UUID,
+        configuration: PageEditConfiguration
+    ) throws {
+        let document = try fetchDocument(documentID)
+        let page = try fetchPage(pageID, in: document)
+        page.rotation = configuration.rotation
+        page.filter = configuration.filter
+        page.documentEnhancementIntensity = configuration.documentEnhancementIntensity
+        page.quad = configuration.quad
+        document.updatedAt = .now
+        try modelContext.save()
+    }
+
+    func reorderPages(_ pageIDs: [UUID], in documentID: UUID) throws {
+        let document = try fetchDocument(documentID)
+        let pageByID = Dictionary(uniqueKeysWithValues: document.pages.map { ($0.id, $0) })
+        guard pageIDs.count == document.pages.count,
+              Set(pageIDs) == Set(pageByID.keys)
+        else { throw DocumentStoreError.documentNotFound(documentID) }
+
+        for (index, pageID) in pageIDs.enumerated() {
+            pageByID[pageID]?.index = index
+        }
+        document.updatedAt = .now
+        try modelContext.save()
+    }
+
+    /// Borra el registro y devuelve los assets que hay que eliminar después
+    /// del `save`. Así un fallo de disco no puede dejar una página apuntando a
+    /// ficheros que ya no existen.
+    func deletePage(_ pageID: UUID, in documentID: UUID) throws -> PageAssetInfo {
+        let document = try fetchDocument(documentID)
+        let page = try fetchPage(pageID, in: document)
+        let assets = PageAssetInfo(
+            originalFileName: page.originalFileName,
+            processedFileName: page.processedFileName,
+            thumbnailFileName: page.thumbnailFileName
+        )
+        document.pages.removeAll { $0.id == pageID }
+        modelContext.delete(page)
+        for (index, remainingPage) in document.orderedPages.enumerated() {
+            remainingPage.index = index
+        }
+        document.updatedAt = .now
+        try modelContext.save()
+        return assets
     }
 
     /// Primer índice libre, para añadir páginas sin pisar las que ya están.
@@ -97,7 +164,10 @@ actor DocumentStore {
             index: record.index,
             originalFileName: record.originalFileName,
             processedFileName: record.processedFileName,
-            thumbnailFileName: record.thumbnailFileName
+            thumbnailFileName: record.thumbnailFileName,
+            filter: record.filter,
+            documentEnhancementIntensity: record.documentEnhancementIntensity,
+            quad: record.quad
         )
     }
 
@@ -110,5 +180,16 @@ actor DocumentStore {
             throw DocumentStoreError.documentNotFound(id)
         }
         return document
+    }
+
+    private func fetchPage(_ pageID: UUID, in documentID: UUID) throws -> ScanPage {
+        try fetchPage(pageID, in: fetchDocument(documentID))
+    }
+
+    private func fetchPage(_ pageID: UUID, in document: ScanDocument) throws -> ScanPage {
+        guard let page = document.pages.first(where: { $0.id == pageID }) else {
+            throw DocumentStoreError.documentNotFound(document.id)
+        }
+        return page
     }
 }

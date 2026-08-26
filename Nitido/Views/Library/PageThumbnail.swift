@@ -7,6 +7,7 @@ struct PageThumbnail: View {
     let documentID: UUID
     let thumbnailFileName: String
     let processedFileName: String
+    var revision: TimeInterval = 0
 
     @Environment(\.fileStore) private var fileStore
     @Environment(\.colorScheme) private var scheme
@@ -27,7 +28,8 @@ struct PageThumbnail: View {
             }
         }
         .clipped()
-        .task(id: thumbnailFileName) {
+        .task(id: "\(thumbnailFileName)-\(revision)") {
+            image = nil
             await load()
         }
     }

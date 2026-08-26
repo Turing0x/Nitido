@@ -17,6 +17,9 @@ final class ScanPage {
     /// 0, 90, 180 o 270.
     var rotation: Int = 0
     var filterRaw: String = PageFilter.original.rawValue
+    /// Intensidad de `CIDocumentEnhancer`. Se guarda para que el filtro
+    /// Documento sea reversible y editable igual que el resto de ajustes.
+    var documentEnhancementIntensity: Double = 1
     /// `QuadPoints` serializado.
     var quadData: Data?
     var ocrText: String = ""
@@ -33,6 +36,7 @@ final class ScanPage {
         thumbnailFileName: String,
         rotation: Int = 0,
         filter: PageFilter = .original,
+        documentEnhancementIntensity: Double = 1,
         quad: QuadPoints? = nil,
         ocrText: String = "",
         ocrBoxes: [OCRBox] = []
@@ -44,6 +48,7 @@ final class ScanPage {
         self.thumbnailFileName = thumbnailFileName
         self.rotation = rotation
         self.filterRaw = filter.rawValue
+        self.documentEnhancementIntensity = documentEnhancementIntensity
         self.quad = quad
         self.ocrText = ocrText
         self.ocrBoxes = ocrBoxes

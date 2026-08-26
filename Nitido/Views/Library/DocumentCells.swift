@@ -47,7 +47,8 @@ struct DocumentGridCell: View {
                         PageThumbnail(
                             documentID: document.id,
                             thumbnailFileName: firstPage.thumbnailFileName,
-                            processedFileName: firstPage.processedFileName
+                            processedFileName: firstPage.processedFileName,
+                            revision: document.updatedAt.timeIntervalSinceReferenceDate
                         )
                     } else {
                         DS.ColorToken.muted(scheme)
@@ -96,7 +97,8 @@ struct DocumentRow: View {
                     PageThumbnail(
                         documentID: document.id,
                         thumbnailFileName: firstPage.thumbnailFileName,
-                        processedFileName: firstPage.processedFileName
+                        processedFileName: firstPage.processedFileName,
+                        revision: document.updatedAt.timeIntervalSinceReferenceDate
                     )
                 } else {
                     DS.ColorToken.muted(scheme)

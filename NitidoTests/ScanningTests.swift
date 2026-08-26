@@ -25,6 +25,28 @@ enum TestFixtures {
         return context.makeImage()!
     }
 
+    /// Degradado con una banda oscura, para que un filtro de documento tenga
+    /// algo que mejorar y el test no dependa de un gris plano.
+    static func gradientImage(width: Int = 240, height: Int = 320) -> CGImage {
+        let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        )!
+        for y in 0..<height {
+            let t = CGFloat(y) / CGFloat(max(height - 1, 1))
+            context.setFillColor(CGColor(red: 0.55 + 0.35 * t, green: 0.5, blue: 0.45, alpha: 1))
+            context.fill(CGRect(x: 0, y: y, width: width, height: 1))
+        }
+        context.setFillColor(CGColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1))
+        context.fill(CGRect(x: 24, y: 24, width: width - 48, height: 18))
+        return context.makeImage()!
+    }
+
     /// PDF de `pageCount` páginas A4.
     static func pdf(pageCount: Int) -> Data {
         let bounds = CGRect(x: 0, y: 0, width: 595, height: 842)
@@ -75,6 +97,54 @@ struct ImageProcessorTests {
 
         let thumbnail2 = try #require(thumbnail)
         #expect(max(thumbnail2.width, thumbnail2.height) == 400)
+    }
+
+    @Test("la previsualización aplica filtros sin superar su límite de tamaño")
+    func previewAppliesNonDestructivePipeline() throws {
+        let source = TestFixtures.image(width: 2_400, height: 3_000)
+        for filter in PageFilter.allCases {
+            let configuration = PageEditConfiguration(
+                rotation: 90,
+                filter: filter,
+                documentEnhancementIntensity: 0.6,
+                quad: .full
+            )
+            let preview = try PageRenderer.preview(source, configuration: configuration)
+            #expect(max(preview.width, preview.height) <= Int(PageRenderer.previewMaxPixelSize))
+        }
+        #expect(source.width == 2_400)
+        #expect(source.height == 3_000)
+    }
+
+    @Test("la corrección de perspectiva produce una página utilizable")
+    func perspectiveCorrectionRendersQuad() throws {
+        let source = TestFixtures.image(width: 800, height: 1_000)
+        let rendered = try PageRenderer.preview(
+            source,
+            configuration: PageEditConfiguration(
+                quad: QuadPoints(
+                    topLeft: .init(x: 0.08, y: 0.05),
+                    topRight: .init(x: 0.93, y: 0.12),
+                    bottomRight: .init(x: 0.88, y: 0.94),
+                    bottomLeft: .init(x: 0.14, y: 0.89)
+                )
+            )
+        )
+
+        #expect(rendered.width > 0)
+        #expect(rendered.height > 0)
+    }
+
+    @Test("la intensidad de Documento cambia el resultado")
+    func documentIntensityChangesOutput() throws {
+        let source = TestFixtures.gradientImage(width: 240, height: 320)
+        let original = try PageRenderer.preview(source, configuration: PageEditConfiguration())
+        let enhanced = try PageRenderer.preview(
+            source,
+            configuration: PageEditConfiguration(filter: .document, documentEnhancementIntensity: 1)
+        )
+        #expect(try ImageProcessor.encodeProcessed(original) != ImageProcessor.encodeProcessed(enhanced))
+        #expect(source.width == 240)
     }
 
     @Test("normalizar una imagen girada intercambia los lados")
@@ -177,6 +247,45 @@ struct PageIngestorTests {
         #expect(box.value == [1, 2, 3])
     }
 
+    @Test("un cuadrilátero detectado recorta el procesado y no toca el original")
+    func detectedQuadIsAppliedNonDestructively() throws {
+        let (store, root) = try TestFixtures.makeFileStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let documentID = UUID()
+        let source = TestFixtures.image(width: 240, height: 300)
+        let quad = QuadPoints(
+            topLeft: .init(x: 0.1, y: 0.1),
+            topRight: .init(x: 0.9, y: 0.1),
+            bottomRight: .init(x: 0.9, y: 0.9),
+            bottomLeft: .init(x: 0.1, y: 0.9)
+        )
+        let records = try PageIngestor(fileStore: store).ingest(
+            [SendableImage(source)],
+            documentID: documentID,
+            detectedQuads: [quad]
+        )
+        let record = try #require(records.first)
+        let original = try store.read(fileName: record.originalFileName, documentID: documentID)
+        let processed = try store.read(fileName: record.processedFileName, documentID: documentID)
+        let originalImage = try #require(Downsampler.fullImage(from: original)?.cgImage)
+        let processedImage = try #require(Downsampler.fullImage(from: processed)?.cgImage)
+
+        #expect(record.quad == quad)
+        #expect(record.filter == .document)
+        #expect(originalImage.width == 240)
+        #expect(originalImage.height == 300)
+        #expect(processedImage.width < originalImage.width)
+        #expect(processedImage.height < originalImage.height)
+    }
+
+    @Test("una imagen sin documento no inventa un recorte")
+    func detectionFailsOpen() async {
+        let blank = TestFixtures.image(width: 200, height: 200)
+        let quad = await DocumentQuadDetector.detect(in: blank)
+        #expect(quad == nil)
+    }
+
     /// Pequeño buzón con cerrojo, solo para recoger el progreso desde el
     /// closure `@Sendable` del test.
     final class Mutex<Value>: @unchecked Sendable {
@@ -242,6 +351,37 @@ struct DocumentStoreTests {
 
         #expect(try await store.nextPageIndex(for: id) == 3)
         #expect(try await store.pageFileNames(for: id).count == 9)
+    }
+
+    @Test("editar, reordenar y eliminar una página mantiene el documento consistente")
+    func editsReordersAndDeletesPage() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let records = makeRecords(3)
+        let id = try await store.createDocument(title: "Factura", records: records)
+
+        let configuration = PageEditConfiguration(
+            rotation: 90,
+            filter: .document,
+            documentEnhancementIntensity: 0.4,
+            quad: QuadPoints(
+                topLeft: .init(x: 0.1, y: 0.1),
+                topRight: .init(x: 0.9, y: 0.1),
+                bottomRight: .init(x: 0.9, y: 0.9),
+                bottomLeft: .init(x: 0.1, y: 0.9)
+            )
+        )
+        try await store.updatePage(records[0].pageID, in: id, configuration: configuration)
+        try await store.reorderPages(Array(records.map(\.pageID).reversed()), in: id)
+        let removed = try await store.deletePage(records[1].pageID, in: id)
+
+        #expect(removed.originalFileName == records[1].originalFileName)
+        #expect(try await store.nextPageIndex(for: id) == 2)
+        #expect(try await store.pageFileNames(for: id).count == 6)
+
+        let remainingIDs = Array(records.map(\.pageID).reversed().filter { $0 != records[1].pageID })
+        let first = try await store.pageAssetInfo(pageID: remainingIDs[0], in: id)
+        #expect(first.originalFileName == records[2].originalFileName)
     }
 
     @Test("renombrar ignora un título en blanco")

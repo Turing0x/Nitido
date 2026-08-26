@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct DocumentDetailView: View {
     let documentID: UUID
@@ -18,6 +19,10 @@ struct DocumentDetailView: View {
     @State private var isShowingPhotoPicker = false
     @State private var isShowingFileImporter = false
     @State private var photoItems: [PhotosPickerItem] = []
+    @State private var isReorderingPages = false
+    @State private var provisionalPageIDs: [UUID] = []
+    @State private var draggingPageID: UUID?
+    @State private var pagePendingDeletion: UUID?
 
     init(documentID: UUID) {
         self.documentID = documentID
@@ -86,6 +91,26 @@ struct DocumentDetailView: View {
                 defaultValue: "Podrás restaurarlo desde la papelera."
             ))
         }
+        .confirmationDialog(
+            String(localized: "page.delete.title", defaultValue: "¿Eliminar página?"),
+            isPresented: Binding(
+                get: { pagePendingDeletion != nil },
+                set: { if !$0 { pagePendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "page.delete.confirm", defaultValue: "Eliminar página"), role: .destructive) {
+                guard let pageID = pagePendingDeletion else { return }
+                provisionalPageIDs.removeAll { $0 == pageID }
+                Task { await coordinator.deletePage(pageID, from: documentID) }
+                pagePendingDeletion = nil
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancelar"), role: .cancel) {
+                pagePendingDeletion = nil
+            }
+        } message: {
+            Text(String(localized: "page.delete.message", defaultValue: "Esta acción elimina la página y sus imágenes."))
+        }
     }
 
     private func pageGrid(for document: ScanDocument) -> some View {
@@ -106,10 +131,12 @@ struct DocumentDetailView: View {
                     ],
                     spacing: DS.Spacing.x5
                 ) {
-                    ForEach(document.orderedPages) { page in
-                        pageCell(page)
+                    ForEach(presentedPages(for: document)) { page in
+                        pageCell(page, in: document)
                     }
-                    addPageCell
+                    if !isReorderingPages {
+                        addPageCell
+                    }
                 }
                 .padding(.horizontal, DS.Spacing.screenGutter)
             }
@@ -117,13 +144,28 @@ struct DocumentDetailView: View {
         }
     }
 
-    private func pageCell(_ page: ScanPage) -> some View {
+    @ViewBuilder
+    private func pageCell(_ page: ScanPage, in document: ScanDocument) -> some View {
+        if isReorderingPages {
+            reorderablePageCell(page, in: document)
+        } else {
+            NavigationLink {
+                PageEditorView(documentID: documentID, pageID: page.id)
+            } label: {
+                pagePreview(page)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func pagePreview(_ page: ScanPage) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.x2) {
             PageCard {
                 PageThumbnail(
                     documentID: documentID,
                     thumbnailFileName: page.thumbnailFileName,
-                    processedFileName: page.processedFileName
+                    processedFileName: page.processedFileName,
+                    revision: pageRevision(page)
                 )
             }
 
@@ -131,6 +173,56 @@ struct DocumentDetailView: View {
                 .font(DS.Typography.captionText)
                 .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
         }
+    }
+
+    private func reorderablePageCell(_ page: ScanPage, in document: ScanDocument) -> some View {
+        pagePreview(page)
+            .overlay(alignment: .topTrailing) {
+                Button(role: .destructive) {
+                    pagePendingDeletion = page.id
+                } label: {
+                    Image(systemName: "trash.circle.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, DS.ColorToken.destructive(scheme))
+                }
+                .padding(DS.Spacing.x2)
+                .accessibilityLabel(String(localized: "page.delete", defaultValue: "Eliminar página"))
+            }
+            .opacity(draggingPageID == page.id ? 0.45 : 1)
+            .onDrag {
+                draggingPageID = page.id
+                return NSItemProvider(object: page.id.uuidString as NSString)
+            }
+            .onDrop(
+                of: [UTType.plainText],
+                delegate: PageReorderDropDelegate(
+                    targetID: page.id,
+                    pageIDs: $provisionalPageIDs,
+                    draggingPageID: $draggingPageID,
+                    onCommit: { pageIDs in
+                        Task { await coordinator.reorderPages(pageIDs, in: documentID) }
+                    }
+                )
+            )
+    }
+
+    /// Firma de las propiedades de la página que afectan a su miniatura, para
+    /// que solo se recargue la página editada y no todas las del documento.
+    private func pageRevision(_ page: ScanPage) -> TimeInterval {
+        var hasher = Hasher()
+        hasher.combine(page.rotation)
+        hasher.combine(page.filterRaw)
+        hasher.combine(page.documentEnhancementIntensity)
+        hasher.combine(page.quadData)
+        return TimeInterval(hasher.finalize())
+    }
+
+    private func presentedPages(for document: ScanDocument) -> [ScanPage] {
+        let ordered = document.orderedPages
+        guard isReorderingPages, !provisionalPageIDs.isEmpty else { return ordered }
+        let pagesByID = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0) })
+        return provisionalPageIDs.compactMap { pagesByID[$0] }
     }
 
     private var addPageCell: some View {
@@ -172,6 +264,21 @@ struct DocumentDetailView: View {
                             ? String(localized: "document.unfavorite", defaultValue: "Quitar de favoritos")
                             : String(localized: "document.favorite", defaultValue: "Añadir a favoritos"),
                         systemImage: document?.isFavorite == true ? "star.slash" : "star"
+                    )
+                }
+
+                Divider()
+
+                Button {
+                    isReorderingPages.toggle()
+                    draggingPageID = nil
+                    provisionalPageIDs = isReorderingPages ? (document?.orderedPages.map(\.id) ?? []) : []
+                } label: {
+                    Label(
+                        isReorderingPages
+                            ? String(localized: "page.reorder.done", defaultValue: "Terminar de reordenar")
+                            : String(localized: "page.reorder", defaultValue: "Reordenar páginas"),
+                        systemImage: isReorderingPages ? "checkmark" : "arrow.left.arrow.right"
                     )
                 }
 
