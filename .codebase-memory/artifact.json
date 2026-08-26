@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "bd7f89acb98265313b1d3b58c9afb07816501cfc",
-    "indexed_at": "2026-08-26T20:43:04Z",
+    "commit": "8573642fea9eba9b415babcf1f19266a365da772",
+    "indexed_at": "2026-08-26T20:43:12Z",
     "project": "Users-raulgarciafernandez-LocalProjects-MyOwnApps-Nitido",
     "nodes": 781,
     "edges": 2309,
     "original_size": 4194304,
-    "compressed_size": 497584,
+    "compressed_size": 497585,
     "compression_level": 3
 }
