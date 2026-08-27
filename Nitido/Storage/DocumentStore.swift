@@ -13,6 +13,13 @@ struct PageAssetInfo: Sendable, Equatable {
     let thumbnailFileName: String
 }
 
+/// Resultado de OCR listo para persistir en una página concreta.
+struct PageOCRUpdate: Sendable, Equatable {
+    let pageID: UUID
+    let text: String
+    let boxes: [OCRBox]
+}
+
 /// Escrituras de SwiftData fuera del hilo principal.
 ///
 /// `@ModelActor` da un ejecutor propio y un `ModelContext` atado a él. Todo lo
@@ -115,13 +122,39 @@ actor DocumentStore {
         return (document.pages.map(\.index).max() ?? -1) + 1
     }
 
-    func rename(_ documentID: UUID, to title: String) throws {
+    @discardableResult
+    func rename(_ documentID: UUID, to title: String) throws -> DocumentSearchSummary {
         let document = try fetchDocument(documentID)
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        document.title = trimmed
+        if !trimmed.isEmpty {
+            document.title = trimmed
+            document.updatedAt = .now
+            try modelContext.save()
+        }
+        return summary(of: document)
+    }
+
+    /// Persiste el resultado del OCR de una página y recalcula el texto de
+    /// búsqueda del documento a partir de todas sus páginas. Se recalcula por
+    /// completo en cada llamada —barato, es solo concatenar cadenas— así el
+    /// documento va quedando buscable página a página en vez de todo de golpe.
+    @discardableResult
+    func setOCRResult(_ update: PageOCRUpdate, in documentID: UUID) throws -> DocumentSearchSummary {
+        let document = try fetchDocument(documentID)
+        let page = try fetchPage(update.pageID, in: document)
+        page.ocrText = update.text
+        page.ocrBoxes = update.boxes
+        document.searchText = document.orderedPages
+            .map(\.ocrText)
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
         document.updatedAt = .now
         try modelContext.save()
+        return summary(of: document)
+    }
+
+    func searchSummary(for documentID: UUID) throws -> DocumentSearchSummary {
+        summary(of: try fetchDocument(documentID))
     }
 
     func setFavorite(_ documentID: UUID, isFavorite: Bool) throws {
@@ -140,11 +173,13 @@ actor DocumentStore {
         try modelContext.save()
     }
 
-    func restoreFromTrash(_ documentID: UUID) throws {
+    @discardableResult
+    func restoreFromTrash(_ documentID: UUID) throws -> DocumentSearchSummary {
         let document = try fetchDocument(documentID)
         document.deletedAt = nil
         document.updatedAt = .now
         try modelContext.save()
+        return summary(of: document)
     }
 
     /// Nombres de fichero de un documento, para poder borrarlos desde fuera sin
@@ -191,5 +226,15 @@ actor DocumentStore {
             throw DocumentStoreError.documentNotFound(document.id)
         }
         return page
+    }
+
+    private func summary(of document: ScanDocument) -> DocumentSearchSummary {
+        DocumentSearchSummary(
+            documentID: document.id,
+            title: document.title,
+            searchText: document.searchText,
+            createdAt: document.createdAt,
+            updatedAt: document.updatedAt
+        )
     }
 }

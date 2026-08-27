@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct NitidoApp: App {
     @State private var services: AppServices
+    @State private var router = AppRouter()
 
     init() {
         _services = State(initialValue: AppServices.bootstrap())
@@ -14,6 +15,7 @@ struct NitidoApp: App {
             RootView(startupError: services.startupError)
                 .environment(\.fileStore, services.fileStore)
                 .environment(services.scanCoordinator)
+                .environment(router)
         }
         .modelContainer(services.modelContainer)
     }

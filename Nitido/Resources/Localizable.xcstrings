@@ -205,6 +205,23 @@
         }
       }
     },
+    "document.ocrProgress": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognizing text %lld/%lld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconociendo texto %lld/%lld"
+          }
+        }
+      }
+    },
     "document.page": {
       "extractionState": "manual",
       "localizations": {
@@ -817,6 +834,105 @@
         }
       }
     },
+    "page.delete": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Eliminar página"
+          }
+        }
+      }
+    },
+    "page.delete.confirm": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Eliminar página"
+          }
+        }
+      }
+    },
+    "page.delete.message": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Esta acción elimina la página y sus imágenes."
+          }
+        }
+      }
+    },
+    "page.delete.title": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "¿Eliminar página?"
+          }
+        }
+      }
+    },
+    "page.reorder": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Reordenar páginas"
+          }
+        }
+      }
+    },
+    "page.reorder.done": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Terminar de reordenar"
+          }
+        }
+      }
+    },
+    "pageEditor.crop": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Recorte"
+          }
+        }
+      }
+    },
+    "pageEditor.documentIntensity": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Intensidad"
+          }
+        }
+      }
+    },
+    "pageEditor.dragHandleHint": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Arrastra para ajustar el recorte"
+          }
+        }
+      }
+    },
     "pageEditor.empty.description": {
       "extractionState": "manual",
       "localizations": {
@@ -847,6 +963,144 @@
           "stringUnit": {
             "state": "translated",
             "value": "Editar página"
+          }
+        }
+      }
+    },
+    "pageEditor.handle.bottomLeft": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Esquina inferior izquierda"
+          }
+        }
+      }
+    },
+    "pageEditor.handle.bottomRight": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Esquina inferior derecha"
+          }
+        }
+      }
+    },
+    "pageEditor.handle.topLeft": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Esquina superior izquierda"
+          }
+        }
+      }
+    },
+    "pageEditor.handle.topRight": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Esquina superior derecha"
+          }
+        }
+      }
+    },
+    "pageEditor.imageUnavailable.title": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "No se pudo abrir la imagen"
+          }
+        }
+      }
+    },
+    "pageEditor.improve": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Mejora"
+          }
+        }
+      }
+    },
+    "pageEditor.loading": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Preparando página…"
+          }
+        }
+      }
+    },
+    "pageEditor.missing.title": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Página no disponible"
+          }
+        }
+      }
+    },
+    "pageEditor.mode": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Herramienta"
+          }
+        }
+      }
+    },
+    "pageEditor.recognizedText": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognized text"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texto reconocido"
+          }
+        }
+      }
+    },
+    "pageEditor.resetCrop": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Restablecer"
+          }
+        }
+      }
+    },
+    "pageEditor.rotate": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Girar"
           }
         }
       }
@@ -915,6 +1169,91 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nítido Pro"
+          }
+        }
+      }
+    },
+    "recognizedText.copy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiar"
+          }
+        }
+      }
+    },
+    "recognizedText.empty.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This page doesn't have recognized text yet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta página todavía no tiene texto reconocido."
+          }
+        }
+      }
+    },
+    "recognizedText.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No recognized text"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin texto reconocido"
+          }
+        }
+      }
+    },
+    "recognizedText.export": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar"
+          }
+        }
+      }
+    },
+    "recognizedText.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognized text"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texto reconocido"
           }
         }
       }
@@ -1204,6 +1543,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Carpetas"
+          }
+        }
+      }
+    },
+    "tab.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar"
           }
         }
       }

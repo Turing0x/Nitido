@@ -182,6 +182,16 @@ struct PageEditorView: View {
             Button(String(localized: "common.cancel", defaultValue: "Cancelar")) { dismiss() }
         }
         ToolbarItem(placement: .topBarTrailing) {
+            NavigationLink {
+                RecognizedTextView(documentID: documentID, pageID: pageID)
+            } label: {
+                Label(
+                    String(localized: "pageEditor.recognizedText", defaultValue: "Texto reconocido"),
+                    systemImage: "doc.text.magnifyingglass"
+                )
+            }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             Button(String(localized: "common.save", defaultValue: "Guardar")) { save() }
                 .disabled(source == nil || isSaving)
         }

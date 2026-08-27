@@ -28,13 +28,13 @@ struct LibraryView: View {
     private var documents: [ScanDocument]
 
     @Environment(ScanCoordinator.self) private var coordinator
+    @Environment(AppRouter.self) private var router
     @Environment(\.colorScheme) private var scheme
 
     @AppStorage("library.layout") private var layoutRaw = LibraryLayout.grid.rawValue
     @AppStorage("library.sort") private var sortRaw = LibrarySort.date.rawValue
 
     @State private var searchText = ""
-    @State private var path: [UUID] = []
     @State private var isShowingCamera = false
     @State private var isShowingPhotoPicker = false
     @State private var isShowingFileImporter = false
@@ -58,7 +58,8 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        @Bindable var router = router
+        NavigationStack(path: $router.libraryPath) {
             content
                 .dsScreenBackground()
                 .navigationTitle(String(localized: "library.title", defaultValue: "Documentos"))
@@ -85,7 +86,7 @@ struct LibraryView: View {
         .onChange(of: coordinator.createdDocumentID) { _, newValue in
             guard let newValue else { return }
             // La captura acaba en el documento nuevo, no de vuelta en la lista.
-            path = [newValue]
+            router.libraryPath = [newValue]
             coordinator.createdDocumentID = nil
         }
     }

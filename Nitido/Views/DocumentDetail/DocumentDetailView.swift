@@ -116,12 +116,16 @@ struct DocumentDetailView: View {
     private func pageGrid(for document: ScanDocument) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.x4) {
-                Text(String(
-                    localized: "document.pageCount",
-                    defaultValue: "\(document.pages.count) páginas"
-                ))
-                .font(DS.Typography.calloutText)
-                .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
+                HStack(spacing: DS.Spacing.x3) {
+                    Text(String(
+                        localized: "document.pageCount",
+                        defaultValue: "\(document.pages.count) páginas"
+                    ))
+                    .font(DS.Typography.calloutText)
+                    .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
+
+                    ocrProgressBadge
+                }
                 .padding(.horizontal, DS.Spacing.screenGutter)
 
                 LazyVGrid(
@@ -141,6 +145,27 @@ struct DocumentDetailView: View {
                 .padding(.horizontal, DS.Spacing.screenGutter)
             }
             .padding(.vertical, DS.Spacing.x4)
+        }
+    }
+
+    /// Indicador discreto y no bloqueante: distinto del `ProcessingOverlay` a
+    /// pantalla completa que usa `coordinator.phase` para la ingesta.
+    @ViewBuilder
+    private var ocrProgressBadge: some View {
+        if let progress = coordinator.ocrProgress[documentID] {
+            HStack(spacing: DS.Spacing.x2) {
+                ProgressView().controlSize(.small)
+                Text(String(
+                    localized: "document.ocrProgress",
+                    defaultValue: "Reconociendo texto \(progress.done)/\(progress.total)"
+                ))
+                .font(DS.Typography.captionText)
+            }
+            .padding(.horizontal, DS.Spacing.x3)
+            .padding(.vertical, DS.Spacing.x2)
+            .background(DS.ColorToken.muted(scheme), in: Capsule())
+            .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
+            .accessibilityElement(children: .combine)
         }
     }
 

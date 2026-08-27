@@ -21,13 +21,24 @@ final class ScanCoordinator {
         var isWorking: Bool { self != .idle }
     }
 
+    /// Progreso del OCR en segundo plano, por documento. A diferencia de
+    /// `phase`, nunca bloquea: es un indicador discreto en la ficha del
+    /// documento mientras el resto de la app sigue usable.
+    struct OCRProgress: Equatable {
+        let done: Int
+        let total: Int
+    }
+
     private(set) var phase: Phase = .idle
     /// Documento recién creado, para que la biblioteca navegue a él.
     var createdDocumentID: UUID?
     var errorMessage: String?
+    private(set) var ocrProgress: [UUID: OCRProgress] = [:]
 
     private let documentStore: DocumentStore
     private let fileStore: any FileStoring
+    private let textRecognizer = TextRecognizer()
+    private let spotlightIndexer = SpotlightIndexer()
 
     init(modelContainer: ModelContainer, fileStore: any FileStoring) {
         self.documentStore = DocumentStore(modelContainer: modelContainer)
@@ -54,6 +65,7 @@ final class ScanCoordinator {
             )
             try await documentStore.createDocument(id: documentID, title: title, records: records)
             createdDocumentID = documentID
+            runOCR(for: documentID, pageIDs: records.map(\.pageID))
         } catch {
             // Si algo falla a mitad, el directorio a medio escribir no se queda
             // ocupando sitio ni ensuciando el cálculo de espacio.
@@ -78,6 +90,7 @@ final class ScanCoordinator {
                 detectionMask: detectionMask
             )
             try await documentStore.appendPages(records, to: documentID)
+            runOCR(for: documentID, pageIDs: records.map(\.pageID))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -169,8 +182,10 @@ final class ScanCoordinator {
     // MARK: - Gestión de documentos
 
     func rename(_ documentID: UUID, to title: String) async {
-        do { try await documentStore.rename(documentID, to: title) }
-        catch { errorMessage = error.localizedDescription }
+        do {
+            let summary = try await documentStore.rename(documentID, to: title)
+            await spotlightIndexer.index(summary)
+        } catch { errorMessage = error.localizedDescription }
     }
 
     func toggleFavorite(_ documentID: UUID, isFavorite: Bool) async {
@@ -179,10 +194,22 @@ final class ScanCoordinator {
     }
 
     /// Borrado lógico. Los ficheros no se tocan: la papelera y su purga son de
-    /// la Sprint 5.
+    /// la Sprint 5. El documento desaparece del buscador del sistema de
+    /// inmediato, aunque todavía se pueda restaurar.
     func moveToTrash(_ documentID: UUID) async {
-        do { try await documentStore.moveToTrash(documentID) }
-        catch { errorMessage = error.localizedDescription }
+        do {
+            try await documentStore.moveToTrash(documentID)
+            await spotlightIndexer.deindex([documentID])
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    /// Sin UI todavía —la papelera llega en la Sprint 5— pero se cablea ya
+    /// para que el índice de Spotlight quede correcto desde el primer momento.
+    func restoreFromTrash(_ documentID: UUID) async {
+        do {
+            let summary = try await documentStore.restoreFromTrash(documentID)
+            await spotlightIndexer.index(summary)
+        } catch { errorMessage = error.localizedDescription }
     }
 
     @discardableResult
@@ -254,6 +281,43 @@ final class ScanCoordinator {
     }
 
     // MARK: - Privado
+
+    /// Reconoce el texto de un lote de páginas recién guardadas, una a una,
+    /// en segundo plano. No forma parte de `phase`: una página que falla no
+    /// aborta el documento ni bloquea nada, solo se queda sin texto (Sprint 5
+    /// lo enseña en la ficha y ofrece reintentar).
+    private func runOCR(for documentID: UUID, pageIDs: [UUID]) {
+        guard !pageIDs.isEmpty else { return }
+        ocrProgress[documentID] = OCRProgress(done: 0, total: pageIDs.count)
+
+        let documentStore = documentStore
+        let fileStore = fileStore
+        let recognizer = textRecognizer
+        let indexer = spotlightIndexer
+
+        Task.detached(priority: .utility) { [weak self] in
+            for (offset, pageID) in pageIDs.enumerated() {
+                do {
+                    let assets = try await documentStore.pageAssetInfo(pageID: pageID, in: documentID)
+                    let data = try fileStore.read(fileName: assets.processedFileName, documentID: documentID)
+                    if let cgImage = autoreleasepool(invoking: { Downsampler.fullImage(from: data)?.cgImage }) {
+                        let result = try await recognizer.recognize(cgImage)
+                        let update = PageOCRUpdate(pageID: pageID, text: result.text, boxes: result.boxes)
+                        let summary = try await documentStore.setOCRResult(update, in: documentID)
+                        if offset == pageIDs.count - 1 {
+                            await indexer.index(summary)
+                        }
+                    }
+                } catch {
+                    // Ver comentario de cabecera: no se propaga.
+                }
+                let done = offset + 1
+                await MainActor.run {
+                    self?.ocrProgress[documentID] = done == pageIDs.count ? nil : OCRProgress(done: done, total: pageIDs.count)
+                }
+            }
+        }
+    }
 
     private func ingest(
         _ images: [SendableImage],

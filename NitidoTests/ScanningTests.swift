@@ -420,6 +420,35 @@ struct DocumentStoreTests {
         #expect(try fetch().deletedAt == nil)
     }
 
+    @Test("el OCR de una página recalcula el texto de búsqueda del documento")
+    func setOCRResultRecomputesSearchText() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let records = makeRecords(3)
+        let id = try await store.createDocument(title: "Factura", records: records)
+
+        let boxes = [OCRBox(text: "Total", x: 0.1, y: 0.8, width: 0.2, height: 0.03, confidence: 0.95)]
+        let summary1 = try await store.setOCRResult(
+            PageOCRUpdate(pageID: records[0].pageID, text: "Total 42 euros", boxes: boxes),
+            in: id
+        )
+        #expect(summary1.searchText == "Total 42 euros")
+
+        // Una página sin texto reconocido (todavía vacía) queda excluida del join.
+        let summary2 = try await store.setOCRResult(
+            PageOCRUpdate(pageID: records[2].pageID, text: "Página final", boxes: []),
+            in: id
+        )
+        #expect(summary2.searchText == "Total 42 euros\nPágina final")
+
+        let assets = try await store.pageAssetInfo(pageID: records[0].pageID, in: id)
+        #expect(assets == PageAssetInfo(
+            originalFileName: records[0].originalFileName,
+            processedFileName: records[0].processedFileName,
+            thumbnailFileName: records[0].thumbnailFileName
+        ))
+    }
+
     @Test("un documento que no existe da documentNotFound")
     func missingDocument() async throws {
         let container = try ModelContainer.nitidoInMemory()
