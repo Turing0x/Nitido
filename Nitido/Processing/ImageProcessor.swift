@@ -93,6 +93,17 @@ enum ImageProcessor {
         return data
     }
 
+    /// Igual que `encode`, pero con calidad configurable y visibilidad
+    /// pública: lo usa `PDFCompression` para los tres niveles de exportación.
+    static func encodeJPEG(_ image: CGImage, quality: Double) -> Data? {
+        encode(image, as: UTType.jpeg, quality: quality)
+    }
+
+    /// Codifica sin pérdida, para exportar páginas sueltas a PNG.
+    static func encodePNG(_ image: CGImage) -> Data? {
+        encode(image, as: UTType.png, quality: 1)
+    }
+
     private static func encode(_ image: CGImage, as type: UTType, quality: Double) -> Data? {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(

@@ -260,7 +260,20 @@ final class ScanCoordinator {
             errorMessage = error.localizedDescription
         }
         phase = .idle
+        // El procesado ha cambiado (rotación, recorte o filtro): las cajas de
+        // OCR guardadas quedarían relativas a píxeles que ya no existen. Se
+        // reconoce de nuevo esta página, igual que tras una captura, para que
+        // el PDF exportado (Sprint 4) no dibuje el texto invisible desplazado.
+        if didSave {
+            runOCR(for: documentID, pageIDs: [pageID])
+        }
         return didSave
+    }
+
+    /// Datos de exportación de un documento entero, en un único viaje al
+    /// actor. Ninguna vista toca `documentStore` directamente.
+    func exportInfo(for documentID: UUID) async throws -> DocumentExportInfo {
+        try await documentStore.exportInfo(for: documentID)
     }
 
     func reorderPages(_ pageIDs: [UUID], in documentID: UUID) async {

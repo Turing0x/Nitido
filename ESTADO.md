@@ -118,6 +118,121 @@ Título por defecto: `Escaneo` + fecha corta localizada, editable.
   antes de escribir. Funciona, pero es incómodo con los títulos automáticos, que son
   largos. Candidato claro a la Sprint 5.
 
+## Sprint 2 — Editor de página ✅
+
+`PageRenderer`, pipeline único y no destructivo para la miniatura de edición y
+para la derivada que se persiste: escala → rotación → corrección de
+perspectiva → filtro. El original nunca se toca; `preview()` limita a 1600 px
+de lado mayor, `fullResolution()` renderiza sin tope solo al confirmar.
+
+**Recorte y perspectiva.** Cuatro puntos (`QuadPoints`) normalizados con Y
+hacia abajo en la UI; `PageRenderer` los convierte al sistema de Core Image
+(origen abajo) en un único sitio (`ciVector`) antes de `CIPerspectiveCorrection`.
+Si el cuadrilátero es la imagen completa (`isFullImage`), se salta la
+corrección de perspectiva.
+
+**Detección automática en importadas.** `DocumentQuadDetector` usa
+`DetectDocumentSegmentationRequest` (API moderna de Vision), convierte a la
+convención de Y de la app y descarta observaciones no usables: cuadrilátero
+degenerado, franja estrecha o área (fórmula de Shoelace) menor al 12 % —
+umbral para no proponer un recorte inútil. Si Vision falla o no encuentra
+nada, la imagen entra igualmente sin recorte sugerido.
+
+**Filtros**, todos en `PageRenderer.applyingFilter`, con `PageFilter` como
+enum persistido (`filterRaw`, no renombrable sin migración):
+
+- Original: sin cambios.
+- Color mejorado: `CIColorControls` (saturación 1.08, contraste 1.14).
+- Escala de grises: `CIColorControls` con saturación 0.
+- Documento: `CIDocumentEnhancer` con intensidad expuesta (`documentEnhancementIntensity`,
+  0–1), sugerido por defecto (`PageFilter.recommendedDefault`).
+- Blanco y negro: gris con contraste 1.25 + `CIColorThreshold` a 0.55.
+
+**Rotación** en pasos de 90°, guardada en `PageEditConfiguration.rotation` y
+normalizada antes de mapear a `CGImagePropertyOrientation`.
+
+**Editor** (`PageEditorView`, 364 líneas): tiradores arrastrables sobre los
+cuatro puntos, con lupa (zoom 2.2×) que sigue al dedo mientras se arrastra un
+tirador, para no tapar el punto que se está ajustando. Previsualización sobre
+la versión reducida (1600 px), renderizado a resolución completa solo al
+confirmar. Reordenar páginas arrastrando y eliminar página, integrados con
+`DocumentStore`.
+
+### Pendiente de la Sprint 2
+
+- Criterio de aceptación (factura torcida, a mano, con sombra → recta y
+  legible en menos de cinco toques) sin ejecutar en iPhone físico.
+
+## Sprint 3 — OCR y búsqueda ✅
+
+`TextRecognizer` sobre `RecognizeTextRequest` (API moderna de Vision), nivel
+preciso, corrección lingüística y detección automática de idioma
+(español/inglés prioritarios). Corre sobre `processedFileName` —el
+procesado, no el original— porque el contraste del modo Documento mejora la
+tasa de acierto.
+
+Se guardan `ocrText` (texto plano, ya en orden de lectura humano vía
+`inReadingOrder()`) y `ocrBoxesData` (`[OCRBox]`, normalizadas, **origen
+abajo-izquierda tal como las devuelve Vision, sin convertir** — la conversión
+de eje se deja para el punto de dibujo, que es Sprint 4).
+
+OCR en segundo plano tras guardar un documento, página a página, con
+indicador discreto en la ficha (`ocrProgress`). Búsqueda global con
+resaltado, indexación en Core Spotlight con deep link, pantalla de texto
+reconocido con copiar y exportar `.txt`.
+
+## Sprint 4 — Exportación a PDF ✅
+
+**`PDFExporter`**, con `UIGraphicsPDFRenderer`: por página, dibuja la imagen
+procesada y encima el texto reconocido en modo invisible
+(`setTextDrawingMode(.invisible)`), colocado sobre sus cajas de OCR. La
+conversión de eje Y (Vision origen abajo-izquierda → UIKit/PDF origen
+arriba-izquierda) vive en un único sitio, `pdfRect(for:in:)`
+(`PDFCoordinateMapping.swift`), verificado tanto con tests (caja arriba/abajo/
+ancho completo) como generando un PDF real y comprobando con
+`PDFDocument.findString` que el texto se encuentra donde se dibujó. El
+tamaño de fuente se ajusta midiendo la cadena a un tamaño de referencia
+(100 pt) y escalando para que coincida con el ancho de la caja
+(`PDFExporter.fittedFontSize`), no un tamaño fijo.
+
+Tres tamaños de página (ajustar a la imagen / A4 / Carta con márgenes), tres
+niveles de compresión (`PDFCompression`, 3000/2000/1400 px ·
+0.85/0.6/0.4 JPEG) con peso estimado antes de exportar, protección con
+contraseña (`PDFPasswordProtector`, un solo campo como owner+user password de
+`PDFDocument`), exportación a JPG/PNG página suelta o todas
+(`ImageExporter`, varios ficheros en un único `ShareLink`, sin zip).
+
+**Trampa encontrada y corregida en el simulador, no solo en tests:** dibujar
+un `CGImage` ya decodificado con `UIImage.draw(in:)` dentro de un contexto
+`UIGraphicsPDFRenderer` **no conserva la compresión JPEG** — Core Graphics lo
+reincrusta como bitmap, y un documento con un peso estimado de 4,5 MB salía
+con 28,3 MB reales. Se arregla construyendo el `CGImage` directamente desde
+los bytes JPEG con `CGImage(jpegDataProviderSource:)`, que sí hace que Core
+Graphics empotre el mismo flujo comprimido. Con eso, peso estimado y peso
+real coinciden exactamente. Comprobado exportando de verdad en el
+simulador (PDF y JPG), no solo con la suite de tests.
+
+`ScanCoordinator.savePageEdit` ahora relanza el OCR de la página tras
+guardar una edición (rotar/recortar/filtro), para que las cajas de texto no
+queden desincronizadas de los píxeles del procesado tras un reajuste
+posterior al reconocimiento inicial.
+
+**33 tests nuevos** (coordenadas, ajuste de fuente, compresión, saneado de
+nombre, `DocumentStore.exportInfo`, PDF real con búsqueda de texto,
+protección con contraseña), **59 en total, todos en verde**.
+
+### Pendiente de la Sprint 4
+
+- Criterio de aceptación real —abrir en Preview de macOS y Adobe Reader,
+  Cmd+F— sin ejecutar todavía: solo verificado que Preview de iOS (Vista
+  Previa) abre el PDF y genera miniatura correctamente, y que `PDFKit`
+  encuentra el texto invisible en su sitio (test automatizado). Falta la
+  verificación cruzada en un visor de terceros que el HANDOFF pide
+  explícitamente.
+- La estimación de peso para JPG/PNG usa como aproximación el mismo cálculo
+  JPEG aunque el formato elegido sea PNG (sin pérdida, más pesado); es una
+  aproximación deliberada, documentada en el código.
+
 ## Decisiones cerradas (26/08/2026)
 
 - **Cámara: VisionKit, sin discusión.** `VNDocumentCameraViewController` con su

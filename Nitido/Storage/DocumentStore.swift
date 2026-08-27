@@ -20,6 +20,25 @@ struct PageOCRUpdate: Sendable, Equatable {
     let boxes: [OCRBox]
 }
 
+/// Todo lo que necesita el exportador de una página. El OCR corre siempre
+/// sobre `processedFileName` (ver `ScanCoordinator.runOCR`), así que las
+/// cajas ya son relativas a esos píxeles exactos: no hace falta llevar
+/// también la `PageEditConfiguration`, ni volver a renderizar nada.
+struct PageExportInfo: Sendable, Equatable {
+    let pageID: UUID
+    let index: Int
+    let processedFileName: String
+    let ocrBoxes: [OCRBox]
+}
+
+/// Todo lo que necesita el exportador de un documento entero.
+struct DocumentExportInfo: Sendable, Equatable {
+    let documentID: UUID
+    let title: String
+    /// Ya en orden de presentación (`orderedPages`).
+    let pages: [PageExportInfo]
+}
+
 /// Escrituras de SwiftData fuera del hilo principal.
 ///
 /// `@ModelActor` da un ejecutor propio y un `ModelContext` atado a él. Todo lo
@@ -180,6 +199,21 @@ actor DocumentStore {
         document.updatedAt = .now
         try modelContext.save()
         return summary(of: document)
+    }
+
+    /// Todo lo que necesita `PDFExporter`/`ImageExporter` de un documento, en
+    /// un único viaje al actor.
+    func exportInfo(for documentID: UUID) throws -> DocumentExportInfo {
+        let document = try fetchDocument(documentID)
+        let pages = document.orderedPages.map {
+            PageExportInfo(
+                pageID: $0.id,
+                index: $0.index,
+                processedFileName: $0.processedFileName,
+                ocrBoxes: $0.ocrBoxes
+            )
+        }
+        return DocumentExportInfo(documentID: document.id, title: document.title, pages: pages)
     }
 
     /// Nombres de fichero de un documento, para poder borrarlos desde fuera sin

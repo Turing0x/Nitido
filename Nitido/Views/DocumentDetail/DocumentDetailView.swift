@@ -309,6 +309,15 @@ struct DocumentDetailView: View {
 
                 Divider()
 
+                NavigationLink {
+                    ExportView(documentID: documentID)
+                } label: {
+                    Label(String(localized: "document.export", defaultValue: "Exportar"),
+                          systemImage: "square.and.arrow.up")
+                }
+
+                Divider()
+
                 Button(role: .destructive) {
                     isConfirmingDelete = true
                 } label: {

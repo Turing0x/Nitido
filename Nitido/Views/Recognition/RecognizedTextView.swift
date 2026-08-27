@@ -79,10 +79,7 @@ struct RecognizedTextView: View {
             exportURL = nil
             return
         }
-        let base = (document?.title.isEmpty == false ? document!.title : "Nitido")
-        let sanitized = base.components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
-            .joined(separator: "-")
+        let sanitized = ImageExporter.sanitize(document?.title ?? "")
         let fileName = "\(sanitized)-p\(page.index + 1).txt"
         let url = URL.temporaryDirectory.appending(path: fileName, directoryHint: .notDirectory)
         do {
