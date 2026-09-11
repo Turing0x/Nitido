@@ -183,6 +183,8 @@ struct DocumentDetailView: View {
             .overlay(alignment: .topTrailing) {
                 if page.ocrFailed {
                     ocrRetryBadge(page)
+                } else if page.ocrDeferred {
+                    ocrDeferredBadge
                 }
             }
         }
@@ -205,6 +207,21 @@ struct DocumentDetailView: View {
             localized: "page.ocrFailed.retry",
             defaultValue: "No se pudo reconocer el texto. Toca para reintentar."
         ))
+    }
+
+    /// La página espera a que haya cuota. No lleva botón de reintentar a
+    /// propósito: reintentarlo ahora daría el mismo resultado, y el aviso
+    /// explica solo que no se ha perdido nada.
+    private var ocrDeferredBadge: some View {
+        Image(systemName: "clock.badge.questionmark.fill")
+            .font(.title3)
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(.white, DS.ColorToken.mutedForeground(scheme))
+            .padding(DS.Spacing.x2)
+            .accessibilityLabel(String(
+                localized: "page.ocrDeferred",
+                defaultValue: "Sin reconocer: se han agotado las páginas del mes. Se reconocerá sola cuando empiece el mes que viene."
+            ))
     }
 
     private func pagePreview(_ page: ScanPage) -> some View {

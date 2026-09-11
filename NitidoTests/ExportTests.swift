@@ -196,6 +196,36 @@ struct PDFExporterTests {
         #expect(!selections.isEmpty)
     }
 
+    @Test("sin capa de texto el PDF sale como imagen y no se puede buscar")
+    func omitsTextLayerWhenDisabled() throws {
+        let (store, root) = try TestFixtures.makeFileStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let documentID = UUID()
+        let pageID = UUID()
+        let image = TestFixtures.image(width: 800, height: 1_000)
+        let processedData = try ImageProcessor.encodeProcessed(image)
+        let fileName = "processed-\(pageID).jpg"
+        try store.write(processedData, fileName: fileName, documentID: documentID)
+
+        let box = OCRBox(text: "FACTURA", x: 0.3, y: 0.45, width: 0.4, height: 0.08, confidence: 0.95)
+        let info = DocumentExportInfo(
+            documentID: documentID,
+            title: "Factura de prueba",
+            pages: [PageExportInfo(pageID: pageID, index: 0, processedFileName: fileName, ocrBoxes: [box])]
+        )
+
+        let data = try PDFExporter.export(
+            info,
+            options: PDFExportOptions(includesTextLayer: false),
+            fileStore: store
+        )
+
+        let document = try #require(PDFDocument(data: data))
+        #expect(document.pageCount == 1, "la imagen se sigue dibujando")
+        #expect(document.findString("FACTURA", withOptions: []).isEmpty)
+    }
+
     @Test("un documento sin páginas lanza noPages")
     func emptyDocumentThrows() throws {
         let (store, root) = try TestFixtures.makeFileStore()

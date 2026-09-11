@@ -443,6 +443,12 @@ final class ScanCoordinator {
     /// reventaría la memoria por la misma razón por la que el bucle de `runOCR`
     /// es secuencial. Si la cuota se vuelve a agotar a mitad, se para; lo que
     /// quede sigue aplazado para el mes que viene.
+    /// Cuántas páginas esperan cuota en toda la biblioteca. Para el aviso de
+    /// Ajustes, donde se explica que no se han perdido.
+    func deferredOCRPageCount() async -> Int {
+        (try? await documentStore.deferredOCRPageCount()) ?? 0
+    }
+
     func resumeDeferredOCR() async {
         entitlements.refreshPeriod()
         guard !entitlements.hasExhaustedFreeOCR else { return }

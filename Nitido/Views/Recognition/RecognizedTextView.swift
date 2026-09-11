@@ -33,6 +33,17 @@ struct RecognizedTextView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(DS.Spacing.screenGutter)
                 }
+            } else if page?.ocrDeferred == true {
+                // Se distingue del vacío genérico a propósito: aquí no es que
+                // no haya texto, es que todavía no se ha mirado.
+                ContentUnavailableView(
+                    String(localized: "recognizedText.deferred.title", defaultValue: "Esperando al mes que viene"),
+                    systemImage: "clock.badge.questionmark",
+                    description: Text(String(
+                        localized: "recognizedText.deferred.description",
+                        defaultValue: "Se han agotado las páginas que el plan gratuito reconoce cada mes. Esta se reconocerá sola cuando empiece el siguiente, o al momento si te haces Pro."
+                    ))
+                )
             } else {
                 ContentUnavailableView(
                     String(localized: "recognizedText.empty.title", defaultValue: "Sin texto reconocido"),

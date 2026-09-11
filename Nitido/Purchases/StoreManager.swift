@@ -40,6 +40,11 @@ final class StoreManager {
     /// suscripción a quien ya pagó una vez y para siempre.
     private(set) var ownsLifetime = false
 
+    /// Le corresponde la prueba de siete días. Quien ya la gastó no debe ver
+    /// prometida una prueba que no va a recibir: eso es motivo de rechazo en
+    /// App Review, además de una mentira.
+    private(set) var isEligibleForTrial = true
+
     var errorMessage: String?
 
     private let defaults: UserDefaults
@@ -134,6 +139,9 @@ final class StoreManager {
                     defaultValue: "Ahora mismo no se pueden cargar los planes. Vuelve a intentarlo en un rato."
                 )
             }
+            if let subscription = product(.yearly)?.subscription {
+                isEligibleForTrial = await subscription.isEligibleForIntroOffer
+            }
         } catch {
             errorMessage = describe(error)
         }
@@ -202,11 +210,12 @@ final class StoreManager {
 
     // MARK: - Privado
 
-    /// Traduce los errores de StoreKit a algo que una persona pueda leer.
+    /// Traduce los errores de StoreKit a algo que una persona pueda leer, o a
+    /// `nil` cuando no hay nada que contar.
     ///
     /// `localizedDescription` del sistema aquí es técnico y a menudo sale en
     /// inglés. Mismo criterio que `ScanCoordinator.reportCameraError`.
-    private func describe(_ error: Error) -> String {
+    private func describe(_ error: Error) -> String? {
         if let storeKitError = error as? StoreKitError {
             switch storeKitError {
             case .networkError:
@@ -220,7 +229,8 @@ final class StoreManager {
                     defaultValue: "Nítido Pro no está disponible en la tienda de tu país."
                 )
             case .userCancelled:
-                return ""
+                // Salir no es un error: no se avisa de nada.
+                return nil
             default:
                 break
             }

@@ -29,6 +29,7 @@ struct LibraryView: View {
 
     @Environment(ScanCoordinator.self) private var coordinator
     @Environment(AppRouter.self) private var router
+    @Environment(Entitlements.self) private var entitlements
     @Environment(\.colorScheme) private var scheme
     @Environment(\.fileStore) private var fileStore
 
@@ -48,6 +49,7 @@ struct LibraryView: View {
     @State private var isExportingSelection = false
     @State private var batchExportURLs: [URL] = []
     @State private var batchExportError: String?
+    @State private var requestedFeature: ProFeature?
 
     private var layout: LibraryLayout { LibraryLayout(rawValue: layoutRaw) ?? .grid }
     private var sort: LibrarySort { LibrarySort(rawValue: sortRaw) ?? .date }
@@ -97,6 +99,7 @@ struct LibraryView: View {
             destinationDocumentID: nil
         )
         .errorAlert(coordinator: coordinator)
+        .proFeatureNotice($requestedFeature)
         .confirmationDialog(
             String(localized: "document.delete.title", defaultValue: "¿Mover a la papelera?"),
             isPresented: Binding(
@@ -378,9 +381,16 @@ struct LibraryView: View {
                 Button {
                     Task { await exportSelection() }
                 } label: {
-                    Image(systemName: "square.and.arrow.up")
+                    HStack(spacing: DS.Spacing.x1) {
+                        Image(systemName: "square.and.arrow.up")
+                        if !entitlements.allows(.batchExport) { ProBadge() }
+                    }
                 }
                 .disabled(selectedIDs.isEmpty)
+                .accessibilityLabel(String(localized: "library.selection.export", defaultValue: "Exportar la selección"))
+                .proGated(.batchExport, isAllowed: entitlements.allows(.batchExport)) {
+                    requestedFeature = $0
+                }
             }
 
             Button(role: .destructive) {
@@ -400,6 +410,9 @@ struct LibraryView: View {
     /// ofrece juntos en un único `ShareLink` — igual patrón que la exportación
     /// de imágenes de un solo documento (Sprint 4): varios ficheros, sin zip.
     private func exportSelection() async {
+        // El botón ya está bloqueado sin Pro; esto lo vuelve a comprobar aquí
+        // para que el gate no dependa de que ninguna pantalla futura se olvide.
+        guard entitlements.allows(.batchExport) else { return }
         isExportingSelection = true
         batchExportURLs = []
         batchExportError = nil
