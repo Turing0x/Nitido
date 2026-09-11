@@ -3,6 +3,7 @@ import SwiftData
 
 enum DocumentStoreError: Error {
     case documentNotFound(UUID)
+    case folderNotFound(UUID)
 }
 
 /// Datos de archivo que el coordinador puede usar fuera del actor sin mover
@@ -225,6 +226,44 @@ actor DocumentStore {
         }
     }
 
+    // MARK: - Carpetas
+
+    @discardableResult
+    func createFolder(id: UUID = UUID(), name: String) throws -> UUID {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let maxIndex = try modelContext.fetch(FetchDescriptor<ScanFolder>())
+            .map(\.sortIndex)
+            .max() ?? -1
+        let folder = ScanFolder(id: id, name: trimmed.isEmpty ? name : trimmed, sortIndex: maxIndex + 1)
+        modelContext.insert(folder)
+        try modelContext.save()
+        return id
+    }
+
+    func renameFolder(_ folderID: UUID, to name: String) throws {
+        let folder = try fetchFolder(folderID)
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        folder.name = trimmed
+        try modelContext.save()
+    }
+
+    /// Borra la carpeta. `deleteRule: .nullify` en `ScanFolder.documents` ya se
+    /// encarga de dejar los documentos sin carpeta; no hay que tocarlos aquí.
+    func deleteFolder(_ folderID: UUID) throws {
+        let folder = try fetchFolder(folderID)
+        modelContext.delete(folder)
+        try modelContext.save()
+    }
+
+    /// `folderID` a `nil` saca el documento de cualquier carpeta.
+    func moveDocument(_ documentID: UUID, toFolder folderID: UUID?) throws {
+        let document = try fetchDocument(documentID)
+        document.folder = try folderID.map(fetchFolder)
+        document.updatedAt = .now
+        try modelContext.save()
+    }
+
     // MARK: - Privado
 
     private func makePage(from record: PageRecord) -> ScanPage {
@@ -253,6 +292,17 @@ actor DocumentStore {
 
     private func fetchPage(_ pageID: UUID, in documentID: UUID) throws -> ScanPage {
         try fetchPage(pageID, in: fetchDocument(documentID))
+    }
+
+    private func fetchFolder(_ id: UUID) throws -> ScanFolder {
+        var descriptor = FetchDescriptor<ScanFolder>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        guard let folder = try modelContext.fetch(descriptor).first else {
+            throw DocumentStoreError.folderNotFound(id)
+        }
+        return folder
     }
 
     private func fetchPage(_ pageID: UUID, in document: ScanDocument) throws -> ScanPage {

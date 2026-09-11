@@ -33,23 +33,29 @@ struct LibraryView: View {
 
     @AppStorage("library.layout") private var layoutRaw = LibraryLayout.grid.rawValue
     @AppStorage("library.sort") private var sortRaw = LibrarySort.date.rawValue
+    @AppStorage("library.favoritesOnly") private var favoritesOnly = false
 
     @State private var searchText = ""
     @State private var isShowingCamera = false
     @State private var isShowingPhotoPicker = false
     @State private var isShowingFileImporter = false
     @State private var photoItems: [PhotosPickerItem] = []
+    @State private var documentPendingTrash: ScanDocument?
 
     private var layout: LibraryLayout { LibraryLayout(rawValue: layoutRaw) ?? .grid }
     private var sort: LibrarySort { LibrarySort(rawValue: sortRaw) ?? .date }
 
     private var visibleDocuments: [ScanDocument] {
-        let filtered = searchText.isEmpty
+        var filtered = searchText.isEmpty
             ? documents
             : documents.filter {
                 $0.title.localizedStandardContains(searchText)
                     || $0.searchText.localizedStandardContains(searchText)
             }
+
+        if favoritesOnly {
+            filtered = filtered.filter(\.isFavorite)
+        }
 
         switch sort {
         case .date: return filtered
@@ -83,6 +89,29 @@ struct LibraryView: View {
             destinationDocumentID: nil
         )
         .errorAlert(coordinator: coordinator)
+        .confirmationDialog(
+            String(localized: "document.delete.title", defaultValue: "¿Mover a la papelera?"),
+            isPresented: Binding(
+                get: { documentPendingTrash != nil },
+                set: { if !$0 { documentPendingTrash = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "document.delete.confirm", defaultValue: "Mover a la papelera"),
+                   role: .destructive) {
+                guard let document = documentPendingTrash else { return }
+                Task { await coordinator.moveToTrash(document.id) }
+                documentPendingTrash = nil
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancelar"), role: .cancel) {
+                documentPendingTrash = nil
+            }
+        } message: {
+            Text(String(
+                localized: "document.delete.message",
+                defaultValue: "Podrás restaurarlo desde la papelera."
+            ))
+        }
         .onChange(of: coordinator.createdDocumentID) { _, newValue in
             guard let newValue else { return }
             // La captura acaba en el documento nuevo, no de vuelta en la lista.
@@ -103,20 +132,21 @@ struct LibraryView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView {
+        let isFiltering = !searchText.isEmpty || favoritesOnly
+        return ContentUnavailableView {
             Label(
-                searchText.isEmpty
-                    ? String(localized: "library.empty.title", defaultValue: "Ningún documento todavía")
-                    : String(localized: "library.noResults.title", defaultValue: "Sin resultados"),
-                systemImage: searchText.isEmpty ? "doc.viewfinder" : "magnifyingglass"
+                isFiltering
+                    ? String(localized: "library.noResults.title", defaultValue: "Sin resultados")
+                    : String(localized: "library.empty.title", defaultValue: "Ningún documento todavía"),
+                systemImage: isFiltering ? "magnifyingglass" : "doc.viewfinder"
             )
             .font(DS.Typography.sectionTitle)
         } description: {
-            Text(searchText.isEmpty
-                 ? String(localized: "library.empty.description",
-                          defaultValue: "Escanea tu primer documento. Todo se procesa en este iPhone.")
-                 : String(localized: "library.noResults.description",
-                          defaultValue: "Prueba con otra palabra."))
+            Text(isFiltering
+                 ? String(localized: "library.noResults.description",
+                          defaultValue: "Prueba con otra palabra.")
+                 : String(localized: "library.empty.description",
+                          defaultValue: "Escanea tu primer documento. Todo se procesa en este iPhone."))
             .font(DS.Typography.calloutText)
             .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
         }
@@ -136,6 +166,7 @@ struct LibraryView: View {
                         DocumentGridCell(document: document)
                     }
                     .buttonStyle(.plain)
+                    .contextMenu { documentContextMenu(for: document) }
                 }
             }
             .padding(.horizontal, DS.Spacing.screenGutter)
@@ -152,9 +183,31 @@ struct LibraryView: View {
             }
             .listRowBackground(DS.ColorToken.card(scheme))
             .listRowSeparatorTint(DS.ColorToken.border(scheme))
+            .contextMenu { documentContextMenu(for: document) }
         }
         .listStyle(.plain)
         .safeAreaPadding(.bottom, DS.Spacing.x16)
+    }
+
+    @ViewBuilder
+    private func documentContextMenu(for document: ScanDocument) -> some View {
+        Button {
+            Task { await coordinator.toggleFavorite(document.id, isFavorite: !document.isFavorite) }
+        } label: {
+            Label(
+                document.isFavorite
+                    ? String(localized: "document.unfavorite", defaultValue: "Quitar de favoritos")
+                    : String(localized: "document.favorite", defaultValue: "Añadir a favoritos"),
+                systemImage: document.isFavorite ? "star.slash" : "star"
+            )
+        }
+        FolderMoveMenu(document: document)
+        Divider()
+        Button(role: .destructive) {
+            documentPendingTrash = document
+        } label: {
+            Label(String(localized: "document.delete", defaultValue: "Mover a la papelera"), systemImage: "trash")
+        }
     }
 
     @ToolbarContentBuilder
@@ -173,6 +226,9 @@ struct LibraryView: View {
                     Label(String(localized: "library.layout.list", defaultValue: "Lista"),
                           systemImage: "list.bullet")
                         .tag(LibraryLayout.list.rawValue)
+                }
+                Toggle(isOn: $favoritesOnly) {
+                    Label(String(localized: "library.favoritesOnly", defaultValue: "Solo favoritos"), systemImage: "star")
                 }
             } label: {
                 Label(

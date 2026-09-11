@@ -292,6 +292,10 @@ struct DocumentDetailView: View {
                     )
                 }
 
+                if let document {
+                    FolderMoveMenu(document: document)
+                }
+
                 Divider()
 
                 Button {

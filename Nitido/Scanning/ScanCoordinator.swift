@@ -212,6 +212,32 @@ final class ScanCoordinator {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    // MARK: - Carpetas
+
+    @discardableResult
+    func createFolder(name: String) async -> UUID? {
+        do { return try await documentStore.createFolder(name: name) }
+        catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func renameFolder(_ folderID: UUID, to name: String) async {
+        do { try await documentStore.renameFolder(folderID, to: name) }
+        catch { errorMessage = error.localizedDescription }
+    }
+
+    func deleteFolder(_ folderID: UUID) async {
+        do { try await documentStore.deleteFolder(folderID) }
+        catch { errorMessage = error.localizedDescription }
+    }
+
+    func moveDocument(_ documentID: UUID, toFolder folderID: UUID?) async {
+        do { try await documentStore.moveDocument(documentID, toFolder: folderID) }
+        catch { errorMessage = error.localizedDescription }
+    }
+
     @discardableResult
     func savePageEdit(
         _ configuration: PageEditConfiguration,

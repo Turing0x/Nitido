@@ -458,4 +458,72 @@ struct DocumentStoreTests {
             try await store.rename(UUID(), to: "x")
         }
     }
+
+    @Test("las carpetas se numeran por orden de creación y se pueden renombrar")
+    func createsAndRenamesFolders() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+
+        let firstID = try await store.createFolder(name: "Facturas")
+        let secondID = try await store.createFolder(name: "  Contratos  ")
+        try await store.renameFolder(firstID, to: "  Facturas 2026  ")
+        // Un nombre en blanco no debe dejar la carpeta sin nombre.
+        try await store.renameFolder(secondID, to: "   ")
+
+        let context = ModelContext(container)
+        let folders = try context.fetch(FetchDescriptor<ScanFolder>(sortBy: [SortDescriptor(\.sortIndex)]))
+        #expect(folders.map(\.id) == [firstID, secondID])
+        #expect(folders[0].name == "Facturas 2026")
+        #expect(folders[1].name == "Contratos")
+    }
+
+    @Test("mover un documento de carpeta actualiza la relación en ambos sentidos")
+    func movesDocumentBetweenFolders() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let documentID = try await store.createDocument(title: "Recibo", records: [])
+        let folderID = try await store.createFolder(name: "Recibos")
+
+        try await store.moveDocument(documentID, toFolder: folderID)
+        let context = ModelContext(container)
+        func fetchDocument() throws -> ScanDocument {
+            try #require(
+                try context.fetch(FetchDescriptor<ScanDocument>(predicate: #Predicate { $0.id == documentID })).first
+            )
+        }
+        #expect(try fetchDocument().folder?.id == folderID)
+
+        try await store.moveDocument(documentID, toFolder: nil)
+        #expect(try fetchDocument().folder == nil)
+    }
+
+    @Test("borrar una carpeta deja sus documentos sin carpeta, no los borra")
+    func deletingFolderNullifiesDocuments() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let documentID = try await store.createDocument(title: "Contrato", records: [])
+        let folderID = try await store.createFolder(name: "Legal")
+        try await store.moveDocument(documentID, toFolder: folderID)
+
+        try await store.deleteFolder(folderID)
+
+        let context = ModelContext(container)
+        let document = try #require(
+            try context.fetch(FetchDescriptor<ScanDocument>(predicate: #Predicate { $0.id == documentID })).first
+        )
+        #expect(document.folder == nil)
+        let folders = try context.fetch(FetchDescriptor<ScanFolder>())
+        #expect(folders.isEmpty)
+    }
+
+    @Test("mover a una carpeta que no existe da folderNotFound")
+    func missingFolder() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let documentID = try await store.createDocument(title: "Nómina", records: [])
+
+        await #expect(throws: DocumentStoreError.self) {
+            try await store.moveDocument(documentID, toFolder: UUID())
+        }
+    }
 }
