@@ -48,8 +48,8 @@ struct RecognizedTextView: View {
         .navigationTitle(String(localized: "recognizedText.title", defaultValue: "Texto reconocido"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .onChange(of: page?.ocrText) { _, _ in prepareExport() }
-        .task { prepareExport() }
+        .onChange(of: page?.ocrText) { _, _ in Task { await prepareExport() } }
+        .task { await prepareExport() }
     }
 
     @ToolbarContentBuilder
@@ -74,19 +74,25 @@ struct RecognizedTextView: View {
 
     /// Escribe el texto a un fichero temporal para que `ShareLink` pueda
     /// compartirlo como `.txt`, no como texto plano suelto.
-    private func prepareExport() {
+    private func prepareExport() async {
         guard let page, !page.ocrText.isEmpty else {
             exportURL = nil
             return
         }
+        // Los valores se copian fuera del modelo antes de salir del actor:
+        // `ScanPage` es de SwiftData y no puede cruzar la frontera.
+        let text = page.ocrText
         let sanitized = ImageExporter.sanitize(document?.title ?? "")
         let fileName = "\(sanitized)-p\(page.index + 1).txt"
-        let url = URL.temporaryDirectory.appending(path: fileName, directoryHint: .notDirectory)
-        do {
-            try page.ocrText.write(to: url, atomically: true, encoding: .utf8)
-            exportURL = url
-        } catch {
-            exportURL = nil
-        }
+
+        exportURL = await Task.detached(priority: .utility) { () -> URL? in
+            let url = URL.temporaryDirectory.appending(path: fileName, directoryHint: .notDirectory)
+            do {
+                try text.write(to: url, atomically: true, encoding: .utf8)
+                return url
+            } catch {
+                return nil
+            }
+        }.value
     }
 }

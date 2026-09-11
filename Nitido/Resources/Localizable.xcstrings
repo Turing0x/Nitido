@@ -783,6 +783,57 @@
         }
       }
     },
+    "export.password.error.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a password to protect the PDF, or turn protection off."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribe una contraseña para proteger el PDF, o desactiva la protección."
+          }
+        }
+      }
+    },
+    "export.password.error.invalidDocument": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The PDF could not be prepared for protection."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo preparar el PDF para protegerlo."
+          }
+        }
+      }
+    },
+    "export.password.error.writeFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The PDF could not be encrypted."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo cifrar el PDF."
+          }
+        }
+      }
+    },
     "export.password.field": {
       "extractionState": "manual",
       "localizations": {
@@ -796,6 +847,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Contraseña"
+          }
+        }
+      }
+    },
+    "export.password.required": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a password to export the protected PDF."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribe una contraseña para poder exportar el PDF protegido."
           }
         }
       }
@@ -2172,6 +2240,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "No se pudo abrir el almacenamiento"
+          }
+        }
+      }
+    },
+    "startup.failure.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app’s storage could not be opened. Try restarting your iPhone; if the problem persists, reinstalling Nítido fixes it, but saved documents will be lost."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo abrir el almacenamiento de la app. Prueba a reiniciar el iPhone; si el problema sigue, reinstalar Nítido lo soluciona, pero se perderán los documentos guardados."
+          }
+        }
+      }
+    },
+    "startup.failure.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nítido couldn’t start"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nítido no ha podido arrancar"
           }
         }
       }

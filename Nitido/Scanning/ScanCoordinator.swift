@@ -1,9 +1,9 @@
 import AVFoundation
+import CoreGraphics
 import Foundation
 import PhotosUI
 import SwiftData
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Orquesta la captura y la importación: coge las imágenes, las manda a
 /// procesar fuera del hilo principal y crea el documento.
@@ -45,50 +45,70 @@ final class ScanCoordinator {
         self.fileStore = fileStore
     }
 
+    /// Ejecuta trabajo de disco fuera del hilo principal.
+    ///
+    /// `ScanCoordinator` está en el `MainActor`, así que **toda** llamada
+    /// síncrona a `fileStore` desde sus métodos corre en el hilo principal:
+    /// escribir el JPEG procesado de una página son varios megabytes, y purgar
+    /// una papelera llena son cientos de borrados. Todo eso pasa por aquí.
+    /// Solo para trabajo cuyo fallo ya se ignora a propósito (`try?`): un
+    /// borrado que no se puede completar deja un directorio huérfano, que no es
+    /// motivo para enseñar nada al usuario. El trabajo que sí puede fallar de
+    /// forma relevante lanza su propia `Task.detached`, para no tener que
+    /// pelearse con `rethrows` —`Task.value` lanza por su cuenta, así que el
+    /// compilador nunca podría probar que el único error viene del closure—.
+    private func onFileStore(
+        priority: TaskPriority = .utility,
+        _ work: @escaping @Sendable (any FileStoring) -> Void
+    ) async {
+        let fileStore = fileStore
+        await Task.detached(priority: priority) {
+            work(fileStore)
+        }.value
+    }
+
     // MARK: - Captura e importación
 
     func createDocument(from images: [SendableImage], detectDocuments: Bool = false) async {
-        await createDocument(from: images, detectionMask: Array(repeating: detectDocuments, count: images.count))
+        await createDocument(from: ImageImporter.provider(for: images, detectsDocument: detectDocuments))
     }
 
-    func createDocument(from images: [SendableImage], detectionMask: [Bool]) async {
-        guard !images.isEmpty else { return }
+    /// - Returns: el identificador del documento creado, o `nil` si falló.
+    @discardableResult
+    func createDocument(from provider: PageBatchProvider) async -> UUID? {
+        guard provider.count > 0 else { return nil }
         let documentID = UUID()
         let title = ScanDocument.defaultTitle()
+        var created: UUID?
 
         do {
-            let records = try await ingest(
-                images,
-                documentID: documentID,
-                startingIndex: 0,
-                detectionMask: detectionMask
-            )
+            let records = try await ingest(provider, documentID: documentID, startingIndex: 0)
             try await documentStore.createDocument(id: documentID, title: title, records: records)
             createdDocumentID = documentID
+            created = documentID
             runOCR(for: documentID, pageIDs: records.map(\.pageID))
         } catch {
             // Si algo falla a mitad, el directorio a medio escribir no se queda
             // ocupando sitio ni ensuciando el cálculo de espacio.
-            try? fileStore.deleteDocumentDirectory(for: documentID)
+            await onFileStore { try? $0.deleteDocumentDirectory(for: documentID) }
             errorMessage = error.localizedDescription
         }
         phase = .idle
+        return created
     }
 
     func addPages(_ images: [SendableImage], to documentID: UUID, detectDocuments: Bool = false) async {
-        await addPages(images, to: documentID, detectionMask: Array(repeating: detectDocuments, count: images.count))
+        await addPages(
+            ImageImporter.provider(for: images, detectsDocument: detectDocuments),
+            to: documentID
+        )
     }
 
-    func addPages(_ images: [SendableImage], to documentID: UUID, detectionMask: [Bool]) async {
-        guard !images.isEmpty else { return }
+    func addPages(_ provider: PageBatchProvider, to documentID: UUID) async {
+        guard provider.count > 0 else { return }
         do {
             let startingIndex = try await documentStore.nextPageIndex(for: documentID)
-            let records = try await ingest(
-                images,
-                documentID: documentID,
-                startingIndex: startingIndex,
-                detectionMask: detectionMask
-            )
+            let records = try await ingest(provider, documentID: documentID, startingIndex: startingIndex)
             try await documentStore.appendPages(records, to: documentID)
             runOCR(for: documentID, pageIDs: records.map(\.pageID))
         } catch {
@@ -108,15 +128,13 @@ final class ScanCoordinator {
                 }
                 payloads.append(data)
             }
-            // La decodificación sale del hilo principal.
-            let images = try await Task.detached(priority: .userInitiated) {
-                try ImageImporter.images(fromImageData: payloads)
-            }.value
-
+            // Se conservan los datos comprimidos; la decodificación ocurre lote
+            // a lote dentro de la ingesta, fuera del hilo principal.
+            let provider = ImageImporter.provider(forImageData: payloads)
             if let documentID {
-                await addPages(images, to: documentID, detectDocuments: true)
+                await addPages(provider, to: documentID)
             } else {
-                await createDocument(from: images, detectDocuments: true)
+                await createDocument(from: provider)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -124,6 +142,10 @@ final class ScanCoordinator {
         }
     }
 
+    /// Cada fichero elegido entra como su propio proveedor y se ingiere por
+    /// separado: el primero crea o abre el documento y el resto le añaden
+    /// páginas. Así nunca hay más de un lote de páginas vivo, por muchos
+    /// ficheros o muy largos que sean.
     func importFromFiles(result: Result<[URL], Error>, into documentID: UUID? = nil) async {
         switch result {
         case .failure(let error):
@@ -132,25 +154,26 @@ final class ScanCoordinator {
             guard !urls.isEmpty else { return }
             phase = .working(done: 0, total: urls.count)
             do {
-                // Leer y rasterizar (un PDF puede traer decenas de páginas) fuera
-                // del hilo principal.
-                let imported = try await Task.detached(priority: .userInitiated) {
-                    try urls.map { url -> (images: [SendableImage], detect: Bool) in
-                        let images = try ImageImporter.images(fromFileAt: url)
-                        let type = UTType(filenameExtension: url.pathExtension)
-                        let isPDF = type?.conforms(to: .pdf) == true || url.pathExtension.lowercased() == "pdf"
-                        return (images, !isPDF)
-                    }
-                }.value
-                let images = imported.flatMap(\.images)
-                let detectionMask = imported.flatMap { pair in
-                    Array(repeating: pair.detect, count: pair.images.count)
+                // Abrir el fichero (y contar las páginas de un PDF) sale del
+                // hilo principal; rasterizar ya va por lotes dentro de `ingest`.
+                var providers: [PageBatchProvider] = []
+                for url in urls {
+                    let provider = try await Task.detached(priority: .userInitiated) {
+                        try ImageImporter.provider(forFileAt: url)
+                    }.value
+                    providers.append(provider)
                 }
 
-                if let documentID {
-                    await addPages(images, to: documentID, detectionMask: detectionMask)
-                } else {
-                    await createDocument(from: images, detectionMask: detectionMask)
+                var targetID = documentID
+                for provider in providers {
+                    if let targetID {
+                        await addPages(provider, to: targetID)
+                    } else {
+                        // El resto de ficheros se añaden al documento que acaba
+                        // de crear el primero, no crean uno por fichero.
+                        guard let created = await createDocument(from: provider) else { break }
+                        targetID = created
+                    }
                 }
             } catch {
                 errorMessage = error.localizedDescription
@@ -232,7 +255,7 @@ final class ScanCoordinator {
     func permanentlyDelete(_ documentID: UUID) async {
         do {
             try await documentStore.permanentlyDelete(documentID)
-            try? fileStore.deleteDocumentDirectory(for: documentID)
+            await onFileStore { try? $0.deleteDocumentDirectory(for: documentID) }
             await spotlightIndexer.deindex([documentID])
         } catch { errorMessage = error.localizedDescription }
     }
@@ -242,9 +265,18 @@ final class ScanCoordinator {
     func purgeExpiredTrash() async {
         let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
         guard let expired = try? await documentStore.expiredTrash(before: cutoff), !expired.isEmpty else { return }
+
         for documentID in expired {
             try? await documentStore.permanentlyDelete(documentID)
-            try? fileStore.deleteDocumentDirectory(for: documentID)
+        }
+
+        // Los borrados de disco van juntos y fuera del hilo principal: se llama
+        // al arrancar, y una papelera con cientos de documentos caducados
+        // congelaba el primer frame borrándolos uno a uno en el `MainActor`.
+        await onFileStore(priority: .background) { store in
+            for documentID in expired {
+                try? store.deleteDocumentDirectory(for: documentID)
+            }
         }
     }
 
@@ -313,34 +345,43 @@ final class ScanCoordinator {
         do {
             let assets = try await documentStore.pageAssetInfo(pageID: pageID, in: documentID)
             let fileStore = fileStore
-            let rendered = try await Task.detached(priority: .userInitiated) {
+            let rendered = try await Task.detached(priority: .userInitiated) { () -> (Data, Data?) in
                 let data = try fileStore.read(fileName: assets.originalFileName, documentID: documentID)
                 guard let source = Downsampler.fullImage(from: data)?.cgImage else {
                     throw ImageImportError.unreadable
                 }
-                let image = try PageRenderer.fullResolution(source, configuration: configuration)
-                let processed = try ImageProcessor.encodeProcessed(image)
-                let thumbnail = Downsampler.thumbnail(
-                    from: processed,
-                    maxPixelSize: ImageProcessor.thumbnailMaxPixelSize
-                ).flatMap { try? ImageProcessor.encodeThumbnail($0) }
-                return (processed, thumbnail)
+                return try autoreleasepool {
+                    let image = try PageRenderer.fullResolution(source, configuration: configuration)
+                    let processed = try ImageProcessor.encodeProcessed(image)
+                    let thumbnail = Downsampler.thumbnail(
+                        from: processed,
+                        maxPixelSize: ImageProcessor.thumbnailMaxPixelSize
+                    ).flatMap { try? ImageProcessor.encodeThumbnail($0) }
+                    return (processed, thumbnail)
+                }
             }.value
 
             // La página pudo borrarse mientras se renderizaba: comprobar que
             // sigue existiendo antes de escribir para no dejar ficheros huérfanos.
             _ = try await documentStore.pageAssetInfo(pageID: pageID, in: documentID)
 
-            try fileStore.write(rendered.0, fileName: assets.processedFileName, documentID: documentID)
-            if let thumbnail = rendered.1 {
-                try fileStore.write(thumbnail, fileName: assets.thumbnailFileName, documentID: documentID)
-            }
+            // El procesado a resolución completa son varios megabytes: la
+            // escritura sale del hilo principal igual que el render.
+            try await Task.detached(priority: .userInitiated) {
+                try fileStore.write(rendered.0, fileName: assets.processedFileName, documentID: documentID)
+                if let thumbnail = rendered.1 {
+                    try fileStore.write(thumbnail, fileName: assets.thumbnailFileName, documentID: documentID)
+                }
+            }.value
             do {
                 try await documentStore.updatePage(pageID, in: documentID, configuration: configuration)
             } catch {
-                try? fileStore.delete(fileName: assets.processedFileName, documentID: documentID)
-                if rendered.1 != nil {
-                    try? fileStore.delete(fileName: assets.thumbnailFileName, documentID: documentID)
+                let hadThumbnail = rendered.1 != nil
+                await onFileStore { store in
+                    try? store.delete(fileName: assets.processedFileName, documentID: documentID)
+                    if hadThumbnail {
+                        try? store.delete(fileName: assets.thumbnailFileName, documentID: documentID)
+                    }
                 }
                 throw error
             }
@@ -374,8 +415,10 @@ final class ScanCoordinator {
     func deletePage(_ pageID: UUID, from documentID: UUID) async {
         do {
             let assets = try await documentStore.deletePage(pageID, in: documentID)
-            for fileName in [assets.originalFileName, assets.processedFileName, assets.thumbnailFileName] {
-                try? fileStore.delete(fileName: fileName, documentID: documentID)
+            await onFileStore { store in
+                for fileName in [assets.originalFileName, assets.processedFileName, assets.thumbnailFileName] {
+                    try? store.delete(fileName: fileName, documentID: documentID)
+                }
             }
             ThumbnailCache.shared.removeValue(forKey: assets.thumbnailFileName)
         } catch {
@@ -406,22 +449,28 @@ final class ScanCoordinator {
         let (languages, automaticDetection) = ocrLanguagePreference.recognitionParameters
 
         Task.detached(priority: .utility) { [weak self] in
+            var didRecognizeAnyPage = false
+
             for (offset, pageID) in pageIDs.enumerated() {
                 do {
                     let assets = try await documentStore.pageAssetInfo(pageID: pageID, in: documentID)
                     let data = try fileStore.read(fileName: assets.processedFileName, documentID: documentID)
-                    if let cgImage = autoreleasepool(invoking: { Downsampler.fullImage(from: data)?.cgImage }) {
-                        let result = try await recognizer.recognize(
-                            cgImage,
-                            languages: languages,
-                            automaticallyDetectsLanguage: automaticDetection
-                        )
-                        let update = PageOCRUpdate(pageID: pageID, text: result.text, boxes: result.boxes)
-                        let summary = try await documentStore.setOCRResult(update, in: documentID)
-                        if offset == pageIDs.count - 1 {
-                            await indexer.index(summary)
-                        }
+                    // Una imagen que no decodifica es un fallo de la página, igual
+                    // que un fallo de Vision: antes caía por un `if let` sin `else`
+                    // y no se marcaba, así que la ficha no ofrecía reintentarla.
+                    guard let cgImage = autoreleasepool(invoking: {
+                        Downsampler.fullImage(from: data)?.cgImage
+                    }) else {
+                        throw ImageImportError.unreadable
                     }
+                    let result = try await recognizer.recognize(
+                        cgImage,
+                        languages: languages,
+                        automaticallyDetectsLanguage: automaticDetection
+                    )
+                    let update = PageOCRUpdate(pageID: pageID, text: result.text, boxes: result.boxes)
+                    try await documentStore.setOCRResult(update, in: documentID)
+                    didRecognizeAnyPage = true
                 } catch {
                     try? await documentStore.setOCRFailed(pageID, in: documentID)
                 }
@@ -429,6 +478,16 @@ final class ScanCoordinator {
                 await MainActor.run {
                     self?.ocrProgress[documentID] = done == pageIDs.count ? nil : OCRProgress(done: done, total: pageIDs.count)
                 }
+            }
+
+            // La indexación va **fuera** del bucle y lee el resumen actual del
+            // documento. Antes colgaba de `offset == pageIDs.count - 1` dentro
+            // del `do`: si la última página del lote fallaba, el documento entero
+            // se quedaba sin indexar para siempre —con las otras páginas
+            // reconocidas perfectamente— y no había error que lo delatara.
+            if didRecognizeAnyPage,
+               let summary = try? await documentStore.searchSummary(for: documentID) {
+                await indexer.index(summary)
             }
         }
     }
@@ -447,52 +506,94 @@ final class ScanCoordinator {
             .flatMap(OCRLanguagePreference.init(rawValue:)) ?? .automatic
     }
 
+    /// Ingiere una fuente de páginas **lote a lote**.
+    ///
+    /// Antes esto materializaba el lote entero: un `withTaskGroup` lanzaba una
+    /// tarea de Vision por cada imagen sin límite de concurrencia y devolvía dos
+    /// arrays completos —los originales y sus versiones normalizadas—, así que
+    /// un PDF de cuarenta páginas mantenía ochenta imágenes a resolución
+    /// completa vivas a la vez. Ahora solo vive el lote en curso: se escribe en
+    /// disco, se suelta y se pide el siguiente.
     private func ingest(
-        _ images: [SendableImage],
+        _ provider: PageBatchProvider,
         documentID: UUID,
-        startingIndex: Int,
-        detectionMask: [Bool]
+        startingIndex: Int
     ) async throws -> [PageRecord] {
-        phase = .working(done: 0, total: images.count)
-
-        // Se normaliza una sola vez por imagen aquí (necesario para detectar el
-        // cuadrilátero) y se reutiliza en el ingest en lugar de repetir el
-        // render de orientación por segunda vez.
-        let (detectedQuads, normalizedImages): ([QuadPoints?], [CGImage?]) = await Task.detached(priority: .userInitiated) {
-            await withTaskGroup(of: (Int, QuadPoints?, CGImage?).self) { group in
-                for (index, image) in images.enumerated() {
-                    guard detectionMask.indices.contains(index), detectionMask[index] else { continue }
-                    group.addTask {
-                        let normalized = ImageProcessor.normalized(image)
-                        return (index, await DocumentQuadDetector.detect(in: normalized), normalized)
-                    }
-                }
-                var quads = [QuadPoints?](repeating: nil, count: images.count)
-                var normalized = [CGImage?](repeating: nil, count: images.count)
-                for await (index, quad, image) in group {
-                    quads[index] = quad
-                    normalized[index] = image
-                }
-                return (quads, normalized)
-            }
-        }.value
+        let total = provider.count
+        phase = .working(done: 0, total: total)
 
         let ingestor = PageIngestor(fileStore: fileStore)
-        let onProgress: @Sendable (Int, Int) -> Void = { [weak self] done, total in
-            Task { @MainActor in self?.phase = .working(done: done, total: total) }
-        }
         let defaultFilter = defaultFilter
+        let detects = provider.detectsDocument
 
-        return try await Task.detached(priority: .userInitiated) {
-            try ingestor.ingest(
-                images,
-                documentID: documentID,
-                startingIndex: startingIndex,
-                detectedQuads: detectedQuads,
-                normalizedImages: normalizedImages,
-                defaultFilter: defaultFilter,
-                onProgress: onProgress
+        var records: [PageRecord] = []
+        records.reserveCapacity(total)
+
+        for range in provider.batchRanges {
+            let batchStart = startingIndex + range.lowerBound
+            let doneBefore = range.lowerBound
+            // El progreso se sigue informando página a página, no lote a lote.
+            let onProgress: @Sendable (Int, Int) -> Void = { [weak self] done, _ in
+                Task { @MainActor in
+                    self?.phase = .working(done: doneBefore + done, total: total)
+                }
+            }
+            // Materializar el lote va **dentro** de la tarea de fondo: hacerlo
+            // aquí decodificaría las imágenes en el hilo principal.
+            let materialize = provider.batch
+
+            let batchRecords = try await Task.detached(priority: .userInitiated) { () -> [PageRecord] in
+                let images = try materialize(range)
+                let (quads, normalized) = await ScanCoordinator.detectedQuads(in: images, enabled: detects)
+                return try ingestor.ingest(
+                    images,
+                    documentID: documentID,
+                    startingIndex: batchStart,
+                    detectedQuads: quads,
+                    normalizedImages: normalized,
+                    defaultFilter: defaultFilter,
+                    onProgress: onProgress
+                )
+            }.value
+
+            records.append(contentsOf: batchRecords)
+            phase = .working(done: records.count, total: total)
+        }
+
+        return records
+    }
+
+    /// Detecta el cuadrilátero de cada página del lote y devuelve, de paso, la
+    /// imagen ya normalizada: se necesita para detectar y se reutiliza en la
+    /// ingesta, en vez de repetir el render de orientación una segunda vez.
+    ///
+    /// La concurrencia está acotada por el tamaño del lote
+    /// (`PageBatchProvider.batchSize`), que es justo lo que antes no lo estaba.
+    nonisolated private static func detectedQuads(
+        in images: [SendableImage],
+        enabled: Bool
+    ) async -> ([QuadPoints?], [CGImage?]) {
+        guard enabled else {
+            return (
+                [QuadPoints?](repeating: nil, count: images.count),
+                [CGImage?](repeating: nil, count: images.count)
             )
-        }.value
+        }
+
+        return await withTaskGroup(of: (Int, QuadPoints?, CGImage?).self) { group in
+            for (index, image) in images.enumerated() {
+                group.addTask {
+                    let normalized = ImageProcessor.normalized(image)
+                    return (index, await DocumentQuadDetector.detect(in: normalized), normalized)
+                }
+            }
+            var quads = [QuadPoints?](repeating: nil, count: images.count)
+            var normalized = [CGImage?](repeating: nil, count: images.count)
+            for await (index, quad, image) in group {
+                quads[index] = quad
+                normalized[index] = image
+            }
+            return (quads, normalized)
+        }
     }
 }

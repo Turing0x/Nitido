@@ -185,6 +185,16 @@ struct ExportView: View {
                             text: $password
                         )
                         .listRowBackground(DS.ColorToken.card(scheme))
+
+                        if password.isEmpty {
+                            Text(String(
+                                localized: "export.password.required",
+                                defaultValue: "Escribe una contraseña para poder exportar el PDF protegido."
+                            ))
+                            .font(DS.Typography.captionText)
+                            .foregroundStyle(DS.ColorToken.destructive(scheme))
+                            .listRowBackground(DS.ColorToken.card(scheme))
+                        }
                     }
                 }
             }
@@ -240,8 +250,17 @@ struct ExportView: View {
             } label: {
                 Label(String(localized: "export.action", defaultValue: "Exportar"), systemImage: "square.and.arrow.up")
             }
-            .disabled(format != .pdf && pageSelectionMode == .single && selectedPageID == nil)
+            .disabled(isExportDisabled)
         }
+    }
+
+    /// Una página suelta sin elegir no se puede exportar, y una protección
+    /// con contraseña activada pero en blanco tampoco: antes exportaba un PDF
+    /// sin cifrar que el usuario creía protegido.
+    private var isExportDisabled: Bool {
+        if format != .pdf && pageSelectionMode == .single && selectedPageID == nil { return true }
+        if format == .pdf && isPasswordProtected && password.isEmpty { return true }
+        return false
     }
 
     private static let byteFormatter: ByteCountFormatter = {
@@ -316,16 +335,20 @@ struct ExportView: View {
             switch format {
             case .pdf:
                 let options = PDFExportOptions(pageSizeMode: pageSizeMode, compressionLevel: compressionLevel)
-                let protectionPassword = isPasswordProtected ? password : ""
-                let data = try await Task.detached(priority: .userInitiated) {
+                // `nil` = no se pidió protección. Nunca "" — ver
+                // `PDFPasswordProtector.protect`.
+                let protectionPassword: String? = isPasswordProtected ? password : nil
+                let fileName = "\(ImageExporter.sanitize(info.title)).pdf"
+                // La escritura va dentro de la misma tarea que genera los bytes:
+                // un PDF de decenas de megabytes escrito desde el `MainActor`
+                // bloquea la interfaz el tiempo que tarde el disco.
+                let url = try await Task.detached(priority: .userInitiated) { () -> URL in
                     let raw = try PDFExporter.export(info, options: options, fileStore: store)
-                    return try PDFPasswordProtector.protect(raw, password: protectionPassword)
+                    let data = try PDFPasswordProtector.protect(raw, password: protectionPassword)
+                    let url = URL.temporaryDirectory.appending(path: fileName, directoryHint: .notDirectory)
+                    try data.write(to: url, options: .atomic)
+                    return url
                 }.value
-                let url = URL.temporaryDirectory.appending(
-                    path: "\(ImageExporter.sanitize(info.title)).pdf",
-                    directoryHint: .notDirectory
-                )
-                try data.write(to: url, options: .atomic)
                 exportURLs = [url]
 
             case .jpg, .png:

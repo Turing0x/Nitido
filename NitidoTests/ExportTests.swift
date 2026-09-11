@@ -230,10 +230,22 @@ struct PDFPasswordProtectorTests {
         #expect(!document.unlock(withPassword: "incorrecta"))
     }
 
-    @Test("una contraseña vacía deja el PDF sin modificar")
-    func emptyPasswordLeavesDataUnchanged() throws {
+    @Test("sin protección pedida (nil) el PDF sale sin modificar")
+    func noPasswordLeavesDataUnchanged() throws {
         let original = TestFixtures.pdf(pageCount: 1)
-        let result = try PDFPasswordProtector.protect(original, password: "")
+        let result = try PDFPasswordProtector.protect(original, password: nil)
         #expect(result == original)
+    }
+
+    /// La regresión que motivó el cambio de firma: con `password: ""` esta
+    /// función devolvía el PDF **sin cifrar**, así que marcar "proteger con
+    /// contraseña" y dejar el campo en blanco entregaba un fichero abierto que
+    /// el usuario creía protegido. Ahora falla en vez de mentir.
+    @Test("una contraseña vacía es un error, no un PDF sin cifrar")
+    func emptyPasswordThrows() throws {
+        let original = TestFixtures.pdf(pageCount: 1)
+        #expect(throws: PDFPasswordProtectorError.emptyPassword) {
+            try PDFPasswordProtector.protect(original, password: "")
+        }
     }
 }

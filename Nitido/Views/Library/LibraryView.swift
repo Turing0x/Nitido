@@ -413,14 +413,16 @@ struct LibraryView: View {
                 let info = try await coordinator.exportInfo(for: documentID)
                 let options = PDFExportOptions(pageSizeMode: .fitToImage, compressionLevel: compressionLevel)
                 let fileStore = fileStore
-                let data = try await Task.detached(priority: .userInitiated) {
-                    try PDFExporter.export(info, options: options, fileStore: fileStore)
+                let fileName = "\(ImageExporter.sanitize(info.title))-\(documentID.uuidString.prefix(4)).pdf"
+                // Generar y escribir en la misma tarea de fondo: exportar varios
+                // documentos seguidos desde el `MainActor` bloquea la biblioteca
+                // tantas veces como documentos haya seleccionados.
+                let url = try await Task.detached(priority: .userInitiated) { () -> URL in
+                    let data = try PDFExporter.export(info, options: options, fileStore: fileStore)
+                    let url = URL.temporaryDirectory.appending(path: fileName, directoryHint: .notDirectory)
+                    try data.write(to: url, options: .atomic)
+                    return url
                 }.value
-                let url = URL.temporaryDirectory.appending(
-                    path: "\(ImageExporter.sanitize(info.title))-\(documentID.uuidString.prefix(4)).pdf",
-                    directoryHint: .notDirectory
-                )
-                try data.write(to: url, options: .atomic)
                 urls.append(url)
             } catch {
                 batchExportError = error.localizedDescription

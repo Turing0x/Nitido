@@ -187,6 +187,91 @@ struct ImageImporterTests {
             try ImageImporter.images(fromImageData: [Data("no soy una imagen".utf8)])
         }
     }
+
+    @Test("rasterizar un rango solo toca esas páginas")
+    func rasterizesOnlyTheRequestedRange() throws {
+        let data = TestFixtures.pdf(pageCount: 7)
+        let images = try ImageImporter.rasterize(pdf: data, pages: 2..<5)
+        #expect(images.count == 3)
+    }
+
+    @Test("un rango que se sale del PDF se recorta en vez de fallar")
+    func clampsRangeBeyondTheDocument() throws {
+        let data = TestFixtures.pdf(pageCount: 3)
+        let images = try ImageImporter.rasterize(pdf: data, pages: 1..<99)
+        #expect(images.count == 2)
+    }
+
+    @Test("contar las páginas de un PDF no rasteriza ninguna")
+    func countsPagesWithoutRasterizing() throws {
+        #expect(try ImageImporter.pdfPageCount(of: TestFixtures.pdf(pageCount: 12)) == 12)
+    }
+}
+
+/// El fallo que motivó el troceado: un PDF largo se materializaba entero en
+/// memoria antes de escribir nada. Estos tests fijan que la fuente entrega las
+/// páginas por lotes acotados y que ningún lote se salta ni se repite.
+@Suite("Fuente de páginas por lotes")
+struct PageBatchProviderTests {
+
+    @Test("los rangos cubren todas las páginas, en orden y sin solaparse")
+    func rangesCoverEveryPageOnce() {
+        let provider = PageBatchProvider(count: 10, detectsDocument: false) { _ in [] }
+        let ranges = provider.batchRanges
+
+        #expect(ranges.flatMap { Array($0) } == Array(0..<10))
+        #expect(ranges.allSatisfy { $0.count <= PageBatchProvider.batchSize })
+    }
+
+    @Test("una fuente vacía no produce ningún lote")
+    func emptySourceHasNoBatches() {
+        let provider = PageBatchProvider(count: 0, detectsDocument: false) { _ in [] }
+        #expect(provider.batchRanges.isEmpty)
+    }
+
+    @Test("un PDF largo se entrega por lotes, no de golpe")
+    func pdfIsDeliveredInBatches() throws {
+        let url = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).pdf")
+        try TestFixtures.pdf(pageCount: 8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let provider = try ImageImporter.provider(forFileAt: url)
+        #expect(provider.count == 8)
+        // Ningún lote entrega el documento entero.
+        #expect(provider.batchRanges.count > 1)
+
+        var delivered = 0
+        for range in provider.batchRanges {
+            let images = try provider.batch(range)
+            #expect(images.count == range.count)
+            delivered += images.count
+        }
+        #expect(delivered == 8)
+    }
+
+    @Test("un PDF no pasa por la detección de bordes: ya viene encuadrado")
+    func pdfSkipsDocumentDetection() throws {
+        let url = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).pdf")
+        try TestFixtures.pdf(pageCount: 1).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        #expect(try ImageImporter.provider(forFileAt: url).detectsDocument == false)
+    }
+
+    @Test("las fotos se decodifican al pedir el lote, no al crear la fuente")
+    func photoDataIsDecodedLazily() throws {
+        let encoded = try (0..<4).map { _ in
+            try ImageProcessor.encodeOriginal(TestFixtures.image(width: 120, height: 160)).data
+        }
+        let provider = ImageImporter.provider(forImageData: encoded)
+
+        #expect(provider.count == 4)
+        #expect(provider.detectsDocument)
+
+        let first = try provider.batch(0..<2)
+        #expect(first.count == 2)
+        #expect(first.allSatisfy { $0.cgImage.width > 0 })
+    }
 }
 
 @Suite("Ingesta de páginas")

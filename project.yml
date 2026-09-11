@@ -30,7 +30,7 @@ targets:
         INFOPLIST_FILE: Nitido/Info.plist
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: "0.1.0"
-        TARGETED_DEVICE_FAMILY: "1,2"
+        TARGETED_DEVICE_FAMILY: "1"
         ENABLE_PREVIEWS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_STYLE: Automatic

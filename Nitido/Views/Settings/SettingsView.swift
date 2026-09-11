@@ -116,8 +116,17 @@ struct SettingsView: View {
         .dsScreenBackground()
         .navigationTitle(String(localized: "settings.title", defaultValue: "Ajustes"))
         .task {
-            sizeOnDisk = try? fileStore.sizeOnDisk()
+            sizeOnDisk = await Self.measureSizeOnDisk(fileStore)
         }
+    }
+
+    /// `sizeOnDisk()` enumera **todo** el árbol de ficheros de la app pidiendo
+    /// los atributos de cada uno. En el `MainActor` —que es donde corre `.task`
+    /// de una vista— eso congela Ajustes en una biblioteca grande.
+    private static func measureSizeOnDisk(_ fileStore: any FileStoring) async -> Int64? {
+        await Task.detached(priority: .utility) {
+            try? fileStore.sizeOnDisk()
+        }.value
     }
 
     @ViewBuilder
@@ -126,7 +135,7 @@ struct SettingsView: View {
             Task {
                 isRegeneratingThumbnails = true
                 regeneratedCount = await coordinator.regenerateThumbnails()
-                sizeOnDisk = try? fileStore.sizeOnDisk()
+                sizeOnDisk = await Self.measureSizeOnDisk(fileStore)
                 isRegeneratingThumbnails = false
             }
         } label: {

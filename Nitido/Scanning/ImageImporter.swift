@@ -23,6 +23,39 @@ enum ImageImportError: Error, LocalizedError {
     }
 }
 
+/// Fuente de páginas que se materializan **por lotes**, no todas de golpe.
+///
+/// Importar un PDF de cuarenta páginas decodificándolas a la vez son varios
+/// gigabytes: con `pdfMaxPixelSize` a 3000, una página A4 rasterizada ronda los
+/// 50 MB sin comprimir, y el sistema mata la app mucho antes de llegar al
+/// final. Los `autoreleasepool` no ayudaban porque el array las retenía todas.
+///
+/// Con esto solo viven las páginas del lote en curso: se escriben en disco y se
+/// sueltan antes de pedir el siguiente.
+struct PageBatchProvider: Sendable {
+    /// Cuántas páginas caben en memoria a la vez. Tres es el equilibrio entre
+    /// aprovechar la detección en paralelo y no acercarse al techo de memoria:
+    /// cada página en vuelo son el original decodificado **y** su versión
+    /// normalizada, así que el pico real es el doble de lo que parece.
+    static let batchSize = 3
+
+    let count: Int
+    /// Si las páginas de esta fuente deben pasar por la detección de bordes.
+    /// Un PDF ya viene encuadrado y una captura de VisionKit ya viene
+    /// recortada; detectar ahí solo puede empeorar el resultado.
+    let detectsDocument: Bool
+    /// Materializa las páginas de `range`. Se llama una vez por lote, desde
+    /// una tarea de fondo.
+    let batch: @Sendable (Range<Int>) throws -> [SendableImage]
+
+    /// Rangos en que se recorre la fuente, de `batchSize` en `batchSize`.
+    var batchRanges: [Range<Int>] {
+        stride(from: 0, to: count, by: Self.batchSize).map { lowerBound in
+            lowerBound..<Swift.min(lowerBound + Self.batchSize, count)
+        }
+    }
+}
+
 /// Importación desde Fotos y desde Archivos. Servicio sin estado.
 enum ImageImporter {
 
@@ -44,32 +77,77 @@ enum ImageImporter {
         }
     }
 
-    // MARK: - Archivos
+    // MARK: - Proveedores por lotes
+
+    /// Páginas ya decodificadas (captura de la cámara): no hay nada que
+    /// materializar, pero se envuelven igual para que el pipeline de ingesta
+    /// tenga un único camino.
+    static func provider(for images: [SendableImage], detectsDocument: Bool) -> PageBatchProvider {
+        PageBatchProvider(count: images.count, detectsDocument: detectsDocument) { range in
+            Array(images[range])
+        }
+    }
+
+    /// Fotos: se conservan los datos **comprimidos** y se decodifica por lotes.
+    /// Un HEIC de 2 MB son ~50 MB una vez decodificado, así que guardar la
+    /// forma comprimida y decodificar bajo demanda es la diferencia entre
+    /// importar treinta fotos y que el sistema mate la app.
+    static func provider(forImageData items: [Data]) -> PageBatchProvider {
+        PageBatchProvider(count: items.count, detectsDocument: true) { range in
+            try images(fromImageData: Array(items[range]))
+        }
+    }
 
     /// Un fichero puede dar varias páginas: un PDF de doce páginas entra como
-    /// un documento de doce páginas.
-    static func images(fromFileAt url: URL) throws -> [SendableImage] {
+    /// un documento de doce páginas, rasterizadas por lotes.
+    static func provider(forFileAt url: URL) throws -> PageBatchProvider {
         // Los ficheros que vienen del selector del sistema están fuera del
         // contenedor de la app y hay que pedir acceso explícitamente.
         let needsScope = url.startAccessingSecurityScopedResource()
         defer { if needsScope { url.stopAccessingSecurityScopedResource() } }
 
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        // Se lee entero aquí, mientras dura el permiso de acceso. No se mapea
+        // (`.mappedIfSafe`) porque el proveedor rasteriza después, ya fuera del
+        // ámbito de seguridad, y unos datos mapeados dejarían de ser legibles.
+        // Es la forma comprimida del fichero: muy por debajo de lo que ocupan
+        // sus páginas decodificadas, que es lo que de verdad había que evitar.
+        let data = try Data(contentsOf: url)
         let type = UTType(filenameExtension: url.pathExtension)
+        let isPDF = type?.conforms(to: .pdf) == true || url.pathExtension.lowercased() == "pdf"
 
-        if type?.conforms(to: .pdf) == true || url.pathExtension.lowercased() == "pdf" {
-            return try rasterize(pdf: data)
+        guard isPDF else {
+            guard let image = Downsampler.fullImage(from: data) else {
+                throw ImageImportError.unsupportedType
+            }
+            return PageBatchProvider(count: 1, detectsDocument: true) { _ in [image] }
         }
-        guard let image = Downsampler.fullImage(from: data) else {
-            throw ImageImportError.unsupportedType
+
+        let pageCount = try pdfPageCount(of: data)
+        return PageBatchProvider(count: pageCount, detectsDocument: false) { range in
+            try rasterize(pdf: data, pages: range)
         }
-        return [image]
+    }
+
+    /// Número de páginas de un PDF, sin rasterizar ninguna.
+    static func pdfPageCount(of data: Data) throws -> Int {
+        guard let document = PDFDocument(data: data) else {
+            throw ImageImportError.unreadable
+        }
+        guard document.pageCount > 0 else {
+            throw ImageImportError.emptyPDF
+        }
+        return document.pageCount
     }
 
     // MARK: - PDF
 
     /// Rasteriza un PDF página a página con PDFKit.
-    static func rasterize(pdf data: Data) throws -> [SendableImage] {
+    ///
+    /// - Parameter range: páginas a rasterizar. `nil` las hace todas, que es lo
+    ///   que necesitan los tests pero **no** el camino de producción: ahí se
+    ///   pide siempre un lote acotado (ver `provider(forFileAt:)`), porque
+    ///   materializar un PDF entero se lleva la app por delante.
+    static func rasterize(pdf data: Data, pages range: Range<Int>? = nil) throws -> [SendableImage] {
         guard let document = PDFDocument(data: data) else {
             throw ImageImportError.unreadable
         }
@@ -77,12 +155,13 @@ enum ImageImporter {
             throw ImageImportError.emptyPDF
         }
 
+        let indices = (range ?? 0..<document.pageCount).clamped(to: 0..<document.pageCount)
         var images: [SendableImage] = []
-        images.reserveCapacity(document.pageCount)
+        images.reserveCapacity(indices.count)
 
-        for index in 0..<document.pageCount {
-            // Página a página y dentro de un pool: un PDF grande rasterizado de
-            // golpe se lleva la app por delante.
+        for index in indices {
+            // Página a página y dentro de un pool, para que el pico sea el de
+            // una página y no el del lote entero.
             try autoreleasepool {
                 guard let page = document.page(at: index) else { return }
                 guard let image = render(page) else {
