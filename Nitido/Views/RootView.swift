@@ -14,6 +14,8 @@ struct RootView: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(AppRouter.self) private var router
     @Environment(ScanCoordinator.self) private var coordinator
+    @Environment(StoreManager.self) private var storeManager
+    @Environment(Entitlements.self) private var entitlements
     @State private var selectedTab: AppTab = .documents
     @State private var isShowingStartupError = false
 
@@ -65,6 +67,19 @@ struct RootView: View {
         .task {
             // Purga en segundo plano al arrancar, no bloquea el primer frame.
             await coordinator.purgeExpiredTrash()
+        }
+        .task {
+            // El estado Pro ya viene de caché, así que esto solo lo corrige.
+            // Después se recogen las páginas que se quedaron esperando cuota,
+            // que es lo que hace que el mes nuevo empiece solo.
+            await storeManager.refreshEntitlements()
+            await coordinator.resumeDeferredOCR()
+        }
+        .onChange(of: entitlements.isPro) { _, isPro in
+            // Comprar o restaurar levanta el límite al instante: lo que quedó
+            // aplazado se reconoce sin que haya que reabrir la app.
+            guard isPro else { return }
+            Task { await coordinator.resumeDeferredOCR() }
         }
     }
 }

@@ -37,12 +37,14 @@ final class ScanCoordinator {
 
     private let documentStore: DocumentStore
     private let fileStore: any FileStoring
+    private let entitlements: Entitlements
     private let textRecognizer = TextRecognizer()
     private let spotlightIndexer = SpotlightIndexer()
 
-    init(modelContainer: ModelContainer, fileStore: any FileStoring) {
+    init(modelContainer: ModelContainer, fileStore: any FileStoring, entitlements: Entitlements) {
         self.documentStore = DocumentStore(modelContainer: modelContainer)
         self.fileStore = fileStore
+        self.entitlements = entitlements
     }
 
     /// Ejecuta trabajo de disco fuera del hilo principal.
@@ -434,12 +436,32 @@ final class ScanCoordinator {
         runOCR(for: documentID, pageIDs: [pageID])
     }
 
+    /// Reconoce las páginas que se quedaron esperando cuota.
+    ///
+    /// Se llama al arrancar y al conseguir Pro. Los documentos van **de uno en
+    /// uno**, esperando a que termine cada lote: lanzarlos todos a la vez
+    /// reventaría la memoria por la misma razón por la que el bucle de `runOCR`
+    /// es secuencial. Si la cuota se vuelve a agotar a mitad, se para; lo que
+    /// quede sigue aplazado para el mes que viene.
+    func resumeDeferredOCR() async {
+        entitlements.refreshPeriod()
+        guard !entitlements.hasExhaustedFreeOCR else { return }
+        guard let pending = try? await documentStore.deferredOCRPages(), !pending.isEmpty else { return }
+
+        for (documentID, pageIDs) in pending {
+            await runOCR(for: documentID, pageIDs: pageIDs).value
+            if entitlements.hasExhaustedFreeOCR { return }
+        }
+    }
+
     /// Reconoce el texto de un lote de páginas recién guardadas, una a una,
     /// en segundo plano. No forma parte de `phase`: una página que falla no
     /// aborta el documento ni bloquea nada. El fallo se marca en
     /// `ScanPage.ocrFailed`, que la ficha enseña con un botón de reintentar.
-    private func runOCR(for documentID: UUID, pageIDs: [UUID]) {
-        guard !pageIDs.isEmpty else { return }
+    @discardableResult
+    private func runOCR(for documentID: UUID, pageIDs: [UUID]) -> Task<Void, Never> {
+        // Sin esta salida, un lote vacío dejaría el indicador clavado en 0 de 0.
+        guard !pageIDs.isEmpty else { return Task {} }
         ocrProgress[documentID] = OCRProgress(done: 0, total: pageIDs.count)
 
         let documentStore = documentStore
@@ -448,29 +470,45 @@ final class ScanCoordinator {
         let indexer = spotlightIndexer
         let (languages, automaticDetection) = ocrLanguagePreference.recognitionParameters
 
-        Task.detached(priority: .utility) { [weak self] in
+        return Task.detached(priority: .utility) { [weak self] in
             var didRecognizeAnyPage = false
 
             for (offset, pageID) in pageIDs.enumerated() {
                 do {
-                    let assets = try await documentStore.pageAssetInfo(pageID: pageID, in: documentID)
-                    let data = try fileStore.read(fileName: assets.processedFileName, documentID: documentID)
-                    // Una imagen que no decodifica es un fallo de la página, igual
-                    // que un fallo de Vision: antes caía por un `if let` sin `else`
-                    // y no se marcaba, así que la ficha no ofrecía reintentarla.
-                    guard let cgImage = autoreleasepool(invoking: {
-                        Downsampler.fullImage(from: data)?.cgImage
-                    }) else {
-                        throw ImageImportError.unreadable
+                    let info = try await documentStore.ocrPageInfo(pageID: pageID, in: documentID)
+
+                    // La cuota se pregunta y se consume en el actor principal,
+                    // una página cada vez, así que dos lotes simultáneos no se
+                    // pisan y no hace falta ningún cerrojo. Si el coordinador ya
+                    // no existe, la app se está cerrando: se abandona el lote sin
+                    // marcar nada, en vez de dejar páginas aplazadas por error.
+                    guard let permitted = await MainActor.run(body: {
+                        self?.entitlements.permitOCR(alreadyCounted: info.ocrCounted)
+                    }) else { return }
+
+                    if permitted {
+                        let data = try fileStore.read(fileName: info.processedFileName, documentID: documentID)
+                        // Una imagen que no decodifica es un fallo de la página, igual
+                        // que un fallo de Vision: antes caía por un `if let` sin `else`
+                        // y no se marcaba, así que la ficha no ofrecía reintentarla.
+                        guard let cgImage = autoreleasepool(invoking: {
+                            Downsampler.fullImage(from: data)?.cgImage
+                        }) else {
+                            throw ImageImportError.unreadable
+                        }
+                        let result = try await recognizer.recognize(
+                            cgImage,
+                            languages: languages,
+                            automaticallyDetectsLanguage: automaticDetection
+                        )
+                        let update = PageOCRUpdate(pageID: pageID, text: result.text, boxes: result.boxes)
+                        try await documentStore.setOCRResult(update, in: documentID)
+                        didRecognizeAnyPage = true
+                    } else {
+                        // Sin cuota. No es un fallo y no se ofrece reintentar a
+                        // mano: vuelve sola al empezar el mes o al comprar Pro.
+                        try await documentStore.setOCRDeferred(pageID, in: documentID)
                     }
-                    let result = try await recognizer.recognize(
-                        cgImage,
-                        languages: languages,
-                        automaticallyDetectsLanguage: automaticDetection
-                    )
-                    let update = PageOCRUpdate(pageID: pageID, text: result.text, boxes: result.boxes)
-                    try await documentStore.setOCRResult(update, in: documentID)
-                    didRecognizeAnyPage = true
                 } catch {
                     try? await documentStore.setOCRFailed(pageID, in: documentID)
                 }
@@ -501,8 +539,16 @@ final class ScanCoordinator {
             .flatMap(PageFilter.init(rawValue:)) ?? .original
     }
 
+    /// Idioma del reconocimiento.
+    ///
+    /// Elegirlo a mano es de Pro, y el gate se aplica **aquí**, no en el
+    /// selector de Ajustes: si alguien pagó, fijó "español" y luego dejó
+    /// caducar la suscripción, en `UserDefaults` sigue guardado "español". Solo
+    /// comprobándolo en el punto de uso vuelve de verdad a la detección
+    /// automática, sin tener que ir limpiando preferencias viejas.
     private var ocrLanguagePreference: OCRLanguagePreference {
-        UserDefaults.standard.string(forKey: "settings.ocrLanguage")
+        guard entitlements.allows(.manualOCRLanguage) else { return .automatic }
+        return UserDefaults.standard.string(forKey: "settings.ocrLanguage")
             .flatMap(OCRLanguagePreference.init(rawValue:)) ?? .automatic
     }
 

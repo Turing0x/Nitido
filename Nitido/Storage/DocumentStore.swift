@@ -14,6 +14,15 @@ struct PageAssetInfo: Sendable, Equatable {
     let thumbnailFileName: String
 }
 
+/// Lo que el reconocimiento necesita saber de una página antes de empezar:
+/// qué imagen leer y si ya gastó su unidad de la cuota mensual. Va aparte de
+/// `PageAssetInfo` porque aquello describe ficheros que a veces hay que
+/// borrar, y esto una decisión de cuota; mezclarlos confundiría las dos cosas.
+struct PageOCRInfo: Sendable, Equatable {
+    let processedFileName: String
+    let ocrCounted: Bool
+}
+
 /// Resultado de OCR listo para persistir en una página concreta.
 struct PageOCRUpdate: Sendable, Equatable {
     let pageID: UUID
@@ -174,6 +183,10 @@ actor DocumentStore {
         page.ocrText = update.text
         page.ocrBoxes = update.boxes
         page.ocrFailed = false
+        // La unidad de cuota se da por gastada aquí y no antes: si el
+        // reconocimiento no llegó a completarse, no se cobra.
+        page.ocrCounted = true
+        page.ocrDeferred = false
         document.searchText = document.orderedPages
             .map(\.ocrText)
             .filter { !$0.isEmpty }
@@ -323,12 +336,46 @@ actor DocumentStore {
 
     // MARK: - OCR
 
+    func ocrPageInfo(pageID: UUID, in documentID: UUID) throws -> PageOCRInfo {
+        let page = try fetchPage(pageID, in: documentID)
+        return PageOCRInfo(processedFileName: page.processedFileName, ocrCounted: page.ocrCounted)
+    }
+
     /// Marca que el reconocimiento de una página falló, para que la ficha del
     /// documento lo enseñe y ofrezca reintentar en vez de dejarlo en silencio.
     func setOCRFailed(_ pageID: UUID, in documentID: UUID) throws {
         let page = try fetchPage(pageID, in: documentID)
         page.ocrFailed = true
+        page.ocrDeferred = false
         try modelContext.save()
+    }
+
+    /// Marca que la página se queda sin reconocer porque la cuota mensual del
+    /// plan gratuito está agotada. No es un fallo y no se ofrece reintentar a
+    /// mano: se resuelve sola al empezar el mes siguiente o al comprar Pro.
+    func setOCRDeferred(_ pageID: UUID, in documentID: UUID) throws {
+        let page = try fetchPage(pageID, in: documentID)
+        page.ocrDeferred = true
+        page.ocrFailed = false
+        try modelContext.save()
+    }
+
+    /// Páginas que esperan cuota, agrupadas por documento y en orden de
+    /// presentación, para reanudarlas cuando vuelve a haber.
+    func deferredOCRPages() throws -> [UUID: [UUID]] {
+        let documents = try modelContext.fetch(
+            FetchDescriptor<ScanDocument>(predicate: #Predicate { $0.deletedAt == nil })
+        )
+        return documents.reduce(into: [UUID: [UUID]]()) { result, document in
+            let pending = document.orderedPages.filter(\.ocrDeferred).map(\.id)
+            guard !pending.isEmpty else { return }
+            result[document.id] = pending
+        }
+    }
+
+    /// Cuántas páginas de la biblioteca esperan cuota. Para el aviso de Ajustes.
+    func deferredOCRPageCount() throws -> Int {
+        try deferredOCRPages().values.reduce(0) { $0 + $1.count }
     }
 
     /// Nombres de fichero de todas las páginas de la biblioteca (documentos no
