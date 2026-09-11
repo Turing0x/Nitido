@@ -43,3 +43,34 @@ struct FolderMoveMenu: View {
         }
     }
 }
+
+/// Igual que `FolderMoveMenu` pero para varios documentos a la vez (selección
+/// múltiple en la biblioteca): no hay carpeta "actual" que resaltar, porque
+/// puede ser distinta en cada documento seleccionado.
+struct BatchFolderMoveMenu: View {
+    let documentIDs: [UUID]
+    var onMoved: () -> Void = {}
+
+    @Environment(ScanCoordinator.self) private var coordinator
+    @Query(sort: \ScanFolder.sortIndex) private var folders: [ScanFolder]
+
+    var body: some View {
+        Menu {
+            Button(String(localized: "folder.none", defaultValue: "Ninguna")) {
+                Task { await coordinator.moveDocuments(documentIDs, toFolder: nil) }
+                onMoved()
+            }
+            if !folders.isEmpty {
+                Divider()
+                ForEach(folders) { folder in
+                    Button(folder.name) {
+                        Task { await coordinator.moveDocuments(documentIDs, toFolder: folder.id) }
+                        onMoved()
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "folder")
+        }
+    }
+}

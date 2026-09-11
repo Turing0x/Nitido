@@ -30,6 +30,7 @@ struct LibraryView: View {
     @Environment(ScanCoordinator.self) private var coordinator
     @Environment(AppRouter.self) private var router
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.fileStore) private var fileStore
 
     @AppStorage("library.layout") private var layoutRaw = LibraryLayout.grid.rawValue
     @AppStorage("library.sort") private var sortRaw = LibrarySort.date.rawValue
@@ -41,6 +42,12 @@ struct LibraryView: View {
     @State private var isShowingFileImporter = false
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var documentPendingTrash: ScanDocument?
+    @State private var isSelecting = false
+    @State private var selectedIDs: Set<UUID> = []
+    @State private var isConfirmingBatchTrash = false
+    @State private var isExportingSelection = false
+    @State private var batchExportURLs: [URL] = []
+    @State private var batchExportError: String?
 
     private var layout: LibraryLayout { LibraryLayout(rawValue: layoutRaw) ?? .grid }
     private var sort: LibrarySort { LibrarySort(rawValue: sortRaw) ?? .date }
@@ -78,7 +85,8 @@ struct LibraryView: View {
                 )
                 .navigationDestination(for: UUID.self) { DocumentDetailView(documentID: $0) }
                 .toolbar { toolbarContent }
-                .overlay(alignment: .bottomTrailing) { scanButton }
+                .overlay(alignment: .bottomTrailing) { if !isSelecting { scanButton } }
+                .safeAreaInset(edge: .bottom) { if isSelecting { selectionActionBar } }
                 .overlay { progressOverlay }
         }
         .scanSources(
@@ -111,6 +119,35 @@ struct LibraryView: View {
                 localized: "document.delete.message",
                 defaultValue: "Podrás restaurarlo desde la papelera."
             ))
+        }
+        .confirmationDialog(
+            String(localized: "document.delete.title", defaultValue: "¿Mover a la papelera?"),
+            isPresented: $isConfirmingBatchTrash,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "document.delete.confirm", defaultValue: "Mover a la papelera"),
+                   role: .destructive) {
+                let ids = Array(selectedIDs)
+                Task { await coordinator.moveToTrash(ids) }
+                endSelection()
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancelar"), role: .cancel) {}
+        } message: {
+            Text(String(
+                localized: "document.delete.message",
+                defaultValue: "Podrás restaurarlo desde la papelera."
+            ))
+        }
+        .alert(
+            String(localized: "export.error.title", defaultValue: "No se pudo exportar"),
+            isPresented: Binding(
+                get: { batchExportError != nil },
+                set: { if !$0 { batchExportError = nil } }
+            )
+        ) {
+            Button(String(localized: "common.ok", defaultValue: "Aceptar"), role: .cancel) {}
+        } message: {
+            Text(batchExportError ?? "")
         }
         .onChange(of: coordinator.createdDocumentID) { _, newValue in
             guard let newValue else { return }
@@ -162,11 +199,19 @@ struct LibraryView: View {
                 spacing: DS.Spacing.x5
             ) {
                 ForEach(visibleDocuments) { document in
-                    NavigationLink(value: document.id) {
-                        DocumentGridCell(document: document)
+                    if isSelecting {
+                        Button { toggleSelection(document.id) } label: {
+                            DocumentGridCell(document: document)
+                                .overlay(alignment: .topTrailing) { selectionBadge(for: document.id) }
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink(value: document.id) {
+                            DocumentGridCell(document: document)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { documentContextMenu(for: document) }
                     }
-                    .buttonStyle(.plain)
-                    .contextMenu { documentContextMenu(for: document) }
                 }
             }
             .padding(.horizontal, DS.Spacing.screenGutter)
@@ -178,15 +223,49 @@ struct LibraryView: View {
 
     private var list: some View {
         List(visibleDocuments) { document in
-            NavigationLink(value: document.id) {
-                DocumentRow(document: document)
+            if isSelecting {
+                Button { toggleSelection(document.id) } label: {
+                    HStack {
+                        DocumentRow(document: document)
+                        Spacer()
+                        selectionBadge(for: document.id)
+                    }
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(DS.ColorToken.card(scheme))
+                .listRowSeparatorTint(DS.ColorToken.border(scheme))
+            } else {
+                NavigationLink(value: document.id) {
+                    DocumentRow(document: document)
+                }
+                .listRowBackground(DS.ColorToken.card(scheme))
+                .listRowSeparatorTint(DS.ColorToken.border(scheme))
+                .contextMenu { documentContextMenu(for: document) }
             }
-            .listRowBackground(DS.ColorToken.card(scheme))
-            .listRowSeparatorTint(DS.ColorToken.border(scheme))
-            .contextMenu { documentContextMenu(for: document) }
         }
         .listStyle(.plain)
-        .safeAreaPadding(.bottom, DS.Spacing.x16)
+        .safeAreaPadding(.bottom, isSelecting ? DS.Spacing.x24 : DS.Spacing.x16)
+    }
+
+    private func toggleSelection(_ id: UUID) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+    }
+
+    @ViewBuilder
+    private func selectionBadge(for id: UUID) -> some View {
+        let isSelected = selectedIDs.contains(id)
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.title3)
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(
+                isSelected ? DS.Brand.ctaPrimaryFG : DS.ColorToken.mutedForeground(scheme),
+                isSelected ? DS.ColorToken.primary(scheme) : DS.ColorToken.card(scheme)
+            )
+            .padding(DS.Spacing.x2)
     }
 
     @ViewBuilder
@@ -212,6 +291,15 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            if !visibleDocuments.isEmpty {
+                Button(isSelecting
+                       ? String(localized: "common.done", defaultValue: "Hecho")
+                       : String(localized: "library.select", defaultValue: "Seleccionar")) {
+                    if isSelecting { endSelection() } else { isSelecting = true }
+                }
+            }
+        }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Picker(String(localized: "library.sort", defaultValue: "Ordenar"), selection: $sortRaw) {
@@ -263,5 +351,82 @@ struct LibraryView: View {
         if case .working(let done, let total) = coordinator.phase {
             ProcessingOverlay(done: done, total: total)
         }
+    }
+
+    private func endSelection() {
+        isSelecting = false
+        selectedIDs = []
+    }
+
+    private var selectionActionBar: some View {
+        HStack(spacing: DS.Spacing.x2) {
+            Text(String(localized: "library.selection.count", defaultValue: "\(selectedIDs.count) seleccionados"))
+                .font(DS.Typography.captionText)
+                .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
+            Spacer()
+
+            BatchFolderMoveMenu(documentIDs: Array(selectedIDs)) { endSelection() }
+                .disabled(selectedIDs.isEmpty)
+
+            if isExportingSelection {
+                ProgressView().controlSize(.small)
+            } else if !batchExportURLs.isEmpty {
+                ShareLink(items: batchExportURLs) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            } else {
+                Button {
+                    Task { await exportSelection() }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .disabled(selectedIDs.isEmpty)
+            }
+
+            Button(role: .destructive) {
+                isConfirmingBatchTrash = true
+            } label: {
+                Image(systemName: "trash")
+            }
+            .disabled(selectedIDs.isEmpty)
+        }
+        .padding(.horizontal, DS.Spacing.screenGutter)
+        .padding(.vertical, DS.Spacing.x3)
+        .background(.bar)
+    }
+
+    /// Exporta cada documento seleccionado como PDF, con los ajustes por
+    /// defecto (ajustar a la imagen, compresión alta, sin contraseña), y los
+    /// ofrece juntos en un único `ShareLink` — igual patrón que la exportación
+    /// de imágenes de un solo documento (Sprint 4): varios ficheros, sin zip.
+    private func exportSelection() async {
+        isExportingSelection = true
+        batchExportURLs = []
+        batchExportError = nil
+        defer { isExportingSelection = false }
+
+        let compressionLevel = UserDefaults.standard.string(forKey: "settings.exportCompression")
+            .flatMap(PDFCompressionLevel.init(rawValue:)) ?? .high
+        var urls: [URL] = []
+        for documentID in selectedIDs {
+            do {
+                let info = try await coordinator.exportInfo(for: documentID)
+                let options = PDFExportOptions(pageSizeMode: .fitToImage, compressionLevel: compressionLevel)
+                let fileStore = fileStore
+                let data = try await Task.detached(priority: .userInitiated) {
+                    try PDFExporter.export(info, options: options, fileStore: fileStore)
+                }.value
+                let url = URL.temporaryDirectory.appending(
+                    path: "\(ImageExporter.sanitize(info.title))-\(documentID.uuidString.prefix(4)).pdf",
+                    directoryHint: .notDirectory
+                )
+                try data.write(to: url, options: .atomic)
+                urls.append(url)
+            } catch {
+                batchExportError = error.localizedDescription
+                return
+            }
+        }
+        batchExportURLs = urls
     }
 }

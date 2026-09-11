@@ -203,13 +203,77 @@ final class ScanCoordinator {
         } catch { errorMessage = error.localizedDescription }
     }
 
-    /// Sin UI todavía —la papelera llega en la Sprint 5— pero se cablea ya
-    /// para que el índice de Spotlight quede correcto desde el primer momento.
     func restoreFromTrash(_ documentID: UUID) async {
         do {
             let summary = try await documentStore.restoreFromTrash(documentID)
             await spotlightIndexer.index(summary)
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    /// Selección múltiple en la biblioteca.
+    func moveToTrash(_ documentIDs: [UUID]) async {
+        guard !documentIDs.isEmpty else { return }
+        do {
+            try await documentStore.moveToTrash(documentIDs)
+            await spotlightIndexer.deindex(documentIDs)
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func moveDocuments(_ documentIDs: [UUID], toFolder folderID: UUID?) async {
+        guard !documentIDs.isEmpty else { return }
+        do { try await documentStore.moveDocuments(documentIDs, toFolder: folderID) }
+        catch { errorMessage = error.localizedDescription }
+    }
+
+    /// Borra un documento de la papelera para siempre: registro y ficheros.
+    /// El registro se borra primero porque no puede fallar a medias; si el
+    /// borrado de ficheros falla después, el documento ya no aparece en
+    /// ningún sitio y el directorio huérfano no ocupa gran cosa.
+    func permanentlyDelete(_ documentID: UUID) async {
+        do {
+            try await documentStore.permanentlyDelete(documentID)
+            try? fileStore.deleteDocumentDirectory(for: documentID)
+            await spotlightIndexer.deindex([documentID])
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    /// Purga los documentos en papelera desde hace más de 30 días. Se llama
+    /// una vez al arrancar (`RootView`); no bloquea ni enseña progreso.
+    func purgeExpiredTrash() async {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
+        guard let expired = try? await documentStore.expiredTrash(before: cutoff), !expired.isEmpty else { return }
+        for documentID in expired {
+            try? await documentStore.permanentlyDelete(documentID)
+            try? fileStore.deleteDocumentDirectory(for: documentID)
+        }
+    }
+
+    /// Regenera todas las miniaturas de la biblioteca a partir del procesado
+    /// de cada página, para el botón de Ajustes. Devuelve cuántas se
+    /// regeneraron.
+    @discardableResult
+    func regenerateThumbnails() async -> Int {
+        guard let targets = try? await documentStore.allThumbnailTargets(), !targets.isEmpty else { return 0 }
+        let fileStore = fileStore
+        var regenerated = 0
+        for target in targets {
+            let didRegenerate: Bool = await Task.detached(priority: .utility) {
+                guard let processedData = try? fileStore.read(
+                    fileName: target.processedFileName, documentID: target.documentID
+                ) else { return false }
+                guard let thumbnail = autoreleasepool(invoking: {
+                    Downsampler.thumbnail(from: processedData, maxPixelSize: ImageProcessor.thumbnailMaxPixelSize)
+                }), let thumbnailData = try? ImageProcessor.encodeThumbnail(thumbnail) else { return false }
+                return (try? fileStore.write(
+                    thumbnailData, fileName: target.thumbnailFileName, documentID: target.documentID
+                )) != nil
+            }.value
+            if didRegenerate {
+                ThumbnailCache.shared.removeValue(forKey: target.thumbnailFileName)
+                regenerated += 1
+            }
+        }
+        return regenerated
     }
 
     // MARK: - Carpetas
@@ -321,10 +385,16 @@ final class ScanCoordinator {
 
     // MARK: - Privado
 
+    /// Reintenta el reconocimiento de una sola página, desde la ficha del
+    /// documento, cuando `ScanPage.ocrFailed` lo pide.
+    func retryOCR(pageID: UUID, documentID: UUID) {
+        runOCR(for: documentID, pageIDs: [pageID])
+    }
+
     /// Reconoce el texto de un lote de páginas recién guardadas, una a una,
     /// en segundo plano. No forma parte de `phase`: una página que falla no
-    /// aborta el documento ni bloquea nada, solo se queda sin texto (Sprint 5
-    /// lo enseña en la ficha y ofrece reintentar).
+    /// aborta el documento ni bloquea nada. El fallo se marca en
+    /// `ScanPage.ocrFailed`, que la ficha enseña con un botón de reintentar.
     private func runOCR(for documentID: UUID, pageIDs: [UUID]) {
         guard !pageIDs.isEmpty else { return }
         ocrProgress[documentID] = OCRProgress(done: 0, total: pageIDs.count)
@@ -333,6 +403,7 @@ final class ScanCoordinator {
         let fileStore = fileStore
         let recognizer = textRecognizer
         let indexer = spotlightIndexer
+        let (languages, automaticDetection) = ocrLanguagePreference.recognitionParameters
 
         Task.detached(priority: .utility) { [weak self] in
             for (offset, pageID) in pageIDs.enumerated() {
@@ -340,7 +411,11 @@ final class ScanCoordinator {
                     let assets = try await documentStore.pageAssetInfo(pageID: pageID, in: documentID)
                     let data = try fileStore.read(fileName: assets.processedFileName, documentID: documentID)
                     if let cgImage = autoreleasepool(invoking: { Downsampler.fullImage(from: data)?.cgImage }) {
-                        let result = try await recognizer.recognize(cgImage)
+                        let result = try await recognizer.recognize(
+                            cgImage,
+                            languages: languages,
+                            automaticallyDetectsLanguage: automaticDetection
+                        )
                         let update = PageOCRUpdate(pageID: pageID, text: result.text, boxes: result.boxes)
                         let summary = try await documentStore.setOCRResult(update, in: documentID)
                         if offset == pageIDs.count - 1 {
@@ -348,7 +423,7 @@ final class ScanCoordinator {
                         }
                     }
                 } catch {
-                    // Ver comentario de cabecera: no se propaga.
+                    try? await documentStore.setOCRFailed(pageID, in: documentID)
                 }
                 let done = offset + 1
                 await MainActor.run {
@@ -356,6 +431,20 @@ final class ScanCoordinator {
                 }
             }
         }
+    }
+
+    /// Filtro con el que arranca una página recién capturada sin cuadrilátero
+    /// detectado (cámara: VisionKit ya la recorta, así que aquí solo decide el
+    /// realce). Ajustable en Ajustes; `UserDefaults` directamente porque
+    /// `@AppStorage` no combina con `@Observable`.
+    private var defaultFilter: PageFilter {
+        UserDefaults.standard.string(forKey: "settings.defaultFilter")
+            .flatMap(PageFilter.init(rawValue:)) ?? .original
+    }
+
+    private var ocrLanguagePreference: OCRLanguagePreference {
+        UserDefaults.standard.string(forKey: "settings.ocrLanguage")
+            .flatMap(OCRLanguagePreference.init(rawValue:)) ?? .automatic
     }
 
     private func ingest(
@@ -392,6 +481,7 @@ final class ScanCoordinator {
         let onProgress: @Sendable (Int, Int) -> Void = { [weak self] done, total in
             Task { @MainActor in self?.phase = .working(done: done, total: total) }
         }
+        let defaultFilter = defaultFilter
 
         return try await Task.detached(priority: .userInitiated) {
             try ingestor.ingest(
@@ -400,6 +490,7 @@ final class ScanCoordinator {
                 startingIndex: startingIndex,
                 detectedQuads: detectedQuads,
                 normalizedImages: normalizedImages,
+                defaultFilter: defaultFilter,
                 onProgress: onProgress
             )
         }.value

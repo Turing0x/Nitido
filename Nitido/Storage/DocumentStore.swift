@@ -40,6 +40,15 @@ struct DocumentExportInfo: Sendable, Equatable {
     let pages: [PageExportInfo]
 }
 
+/// Página de cualquier documento, para operaciones que recorren la
+/// biblioteca entera (regenerar miniaturas) sin sacar modelos del actor.
+struct PageThumbnailTarget: Sendable, Equatable {
+    let documentID: UUID
+    let pageID: UUID
+    let processedFileName: String
+    let thumbnailFileName: String
+}
+
 /// Escrituras de SwiftData fuera del hilo principal.
 ///
 /// `@ModelActor` da un ejecutor propio y un `ModelContext` atado a él. Todo lo
@@ -164,6 +173,7 @@ actor DocumentStore {
         let page = try fetchPage(update.pageID, in: document)
         page.ocrText = update.text
         page.ocrBoxes = update.boxes
+        page.ocrFailed = false
         document.searchText = document.orderedPages
             .map(\.ocrText)
             .filter { !$0.isEmpty }
@@ -200,6 +210,40 @@ actor DocumentStore {
         document.updatedAt = .now
         try modelContext.save()
         return summary(of: document)
+    }
+
+    /// Igual que `moveToTrash` pero para varios documentos a la vez
+    /// (selección múltiple en la biblioteca), en un único `save`.
+    func moveToTrash(_ documentIDs: [UUID]) throws {
+        let now = Date.now
+        for id in documentIDs {
+            guard let document = try? fetchDocument(id) else { continue }
+            document.deletedAt = now
+            document.updatedAt = now
+        }
+        try modelContext.save()
+    }
+
+    /// Borra el registro del documento de SwiftData (el `deleteRule: .cascade`
+    /// de `ScanDocument.pages` se lleva las páginas). Los ficheros de disco no
+    /// se tocan aquí: el llamador los borra con `FileStore` una vez que esto
+    /// no puede fallar a mitad.
+    func permanentlyDelete(_ documentID: UUID) throws {
+        let document = try fetchDocument(documentID)
+        modelContext.delete(document)
+        try modelContext.save()
+    }
+
+    /// Documentos en la papelera desde antes de `cutoff`, listos para que el
+    /// llamador borre sus ficheros y luego confirme el borrado del registro
+    /// con `permanentlyDelete`.
+    func expiredTrash(before cutoff: Date) throws -> [UUID] {
+        let descriptor = FetchDescriptor<ScanDocument>(
+            predicate: #Predicate { $0.deletedAt != nil }
+        )
+        return try modelContext.fetch(descriptor)
+            .filter { ($0.deletedAt ?? .distantFuture) < cutoff }
+            .map(\.id)
     }
 
     /// Todo lo que necesita `PDFExporter`/`ImageExporter` de un documento, en
@@ -262,6 +306,47 @@ actor DocumentStore {
         document.folder = try folderID.map(fetchFolder)
         document.updatedAt = .now
         try modelContext.save()
+    }
+
+    /// Igual que `moveDocument(_:toFolder:)` pero para varios documentos a la
+    /// vez, en un único `save`.
+    func moveDocuments(_ documentIDs: [UUID], toFolder folderID: UUID?) throws {
+        let folder = try folderID.map(fetchFolder)
+        let now = Date.now
+        for id in documentIDs {
+            guard let document = try? fetchDocument(id) else { continue }
+            document.folder = folder
+            document.updatedAt = now
+        }
+        try modelContext.save()
+    }
+
+    // MARK: - OCR
+
+    /// Marca que el reconocimiento de una página falló, para que la ficha del
+    /// documento lo enseñe y ofrezca reintentar en vez de dejarlo en silencio.
+    func setOCRFailed(_ pageID: UUID, in documentID: UUID) throws {
+        let page = try fetchPage(pageID, in: documentID)
+        page.ocrFailed = true
+        try modelContext.save()
+    }
+
+    /// Nombres de fichero de todas las páginas de la biblioteca (documentos no
+    /// borrados), para regenerar miniaturas desde Ajustes.
+    func allThumbnailTargets() throws -> [PageThumbnailTarget] {
+        let documents = try modelContext.fetch(
+            FetchDescriptor<ScanDocument>(predicate: #Predicate { $0.deletedAt == nil })
+        )
+        return documents.flatMap { document in
+            document.pages.map {
+                PageThumbnailTarget(
+                    documentID: document.id,
+                    pageID: $0.id,
+                    processedFileName: $0.processedFileName,
+                    thumbnailFileName: $0.thumbnailFileName
+                )
+            }
+        }
     }
 
     // MARK: - Privado

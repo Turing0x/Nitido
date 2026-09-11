@@ -25,6 +25,10 @@ final class ScanPage {
     var ocrText: String = ""
     /// `[OCRBox]` serializado.
     var ocrBoxesData: Data?
+    /// El reconocimiento se intentó y falló (no distingue "aún no se ha
+    /// intentado" de "se intentó y no encontró texto", que en ambos casos
+    /// deja `ocrText` vacío pero no debe ofrecer reintentar).
+    var ocrFailed: Bool = false
 
     var document: ScanDocument?
 
@@ -39,7 +43,8 @@ final class ScanPage {
         documentEnhancementIntensity: Double = 1,
         quad: QuadPoints? = nil,
         ocrText: String = "",
-        ocrBoxes: [OCRBox] = []
+        ocrBoxes: [OCRBox] = [],
+        ocrFailed: Bool = false
     ) {
         self.id = id
         self.index = index
@@ -52,6 +57,7 @@ final class ScanPage {
         self.quad = quad
         self.ocrText = ocrText
         self.ocrBoxes = ocrBoxes
+        self.ocrFailed = ocrFailed
     }
 
     var filter: PageFilter {

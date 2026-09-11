@@ -54,6 +54,7 @@ struct PageIngestor: Sendable {
         startingIndex: Int = 0,
         detectedQuads: [QuadPoints?] = [],
         normalizedImages: [CGImage?] = [],
+        defaultFilter: PageFilter = .original,
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) throws -> [PageRecord] {
         try fileStore.createDocumentDirectory(for: documentID)
@@ -71,7 +72,8 @@ struct PageIngestor: Sendable {
                     documentID: documentID,
                     index: startingIndex + offset,
                     detectedQuad: detectedQuads[safe: offset] ?? nil,
-                    normalized: normalizedImages[safe: offset] ?? nil
+                    normalized: normalizedImages[safe: offset] ?? nil,
+                    defaultFilter: defaultFilter
                 )
             }
             records.append(record)
@@ -86,7 +88,8 @@ struct PageIngestor: Sendable {
         documentID: UUID,
         index: Int,
         detectedQuad: QuadPoints?,
-        normalized precomputedNormalized: CGImage? = nil
+        normalized precomputedNormalized: CGImage? = nil,
+        defaultFilter: PageFilter = .original
     ) throws -> PageRecord {
         let pageID = UUID()
         let normalized = precomputedNormalized ?? ImageProcessor.normalized(image)
@@ -103,7 +106,7 @@ struct PageIngestor: Sendable {
         //    y el filtro Documento, siempre sin tocar el fichero original.
         let usableQuad = detectedQuad.flatMap { $0.isValidForEditing ? $0 : nil }
         var configuration = PageEditConfiguration(
-            filter: usableQuad == nil ? .original : .document,
+            filter: usableQuad == nil ? defaultFilter : .document,
             documentEnhancementIntensity: 1,
             quad: usableQuad ?? .full
         )

@@ -420,6 +420,103 @@ struct DocumentStoreTests {
         #expect(try fetch().deletedAt == nil)
     }
 
+    @Test("mover varios documentos a la papelera los marca todos y de un solo golpe")
+    func batchTrash() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let a = try await store.createDocument(title: "A", records: makeRecords(1))
+        let b = try await store.createDocument(title: "B", records: makeRecords(1))
+        let c = try await store.createDocument(title: "C", records: makeRecords(1))
+
+        try await store.moveToTrash([a, b])
+
+        let context = ModelContext(container)
+        func deletedAt(_ id: UUID) throws -> Date? {
+            try #require(
+                try context.fetch(FetchDescriptor<ScanDocument>(predicate: #Predicate { $0.id == id })).first
+            ).deletedAt
+        }
+        #expect(try deletedAt(a) != nil)
+        #expect(try deletedAt(b) != nil)
+        #expect(try deletedAt(c) == nil)
+    }
+
+    @Test("borrar definitivamente quita el documento y sus páginas de SwiftData")
+    func permanentlyDeleteRemovesDocument() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let id = try await store.createDocument(title: "Recibo", records: makeRecords(2))
+        try await store.moveToTrash(id)
+
+        try await store.permanentlyDelete(id)
+
+        let context = ModelContext(container)
+        let remaining = try context.fetch(FetchDescriptor<ScanDocument>(predicate: #Predicate { $0.id == id }))
+        #expect(remaining.isEmpty)
+        let remainingPages = try context.fetch(FetchDescriptor<ScanPage>())
+        #expect(remainingPages.isEmpty)
+    }
+
+    @Test("expiredTrash solo devuelve lo borrado antes del corte, no lo reciente ni lo activo")
+    func expiredTrashRespectsCutoff() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let old = try await store.createDocument(title: "Viejo", records: makeRecords(1))
+        let recent = try await store.createDocument(title: "Reciente", records: makeRecords(1))
+        let active = try await store.createDocument(title: "Activo", records: makeRecords(1))
+
+        try await store.moveToTrash(old)
+        try await store.moveToTrash(recent)
+        _ = active
+
+        let context = ModelContext(container)
+        let oldDocument = try #require(
+            try context.fetch(FetchDescriptor<ScanDocument>(predicate: #Predicate { $0.id == old })).first
+        )
+        oldDocument.deletedAt = Calendar.current.date(byAdding: .day, value: -31, to: .now)
+        try context.save()
+
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now)!
+        let expired = try await store.expiredTrash(before: cutoff)
+        #expect(expired == [old])
+    }
+
+    @Test("mover varios documentos de carpeta los deja todos en la misma")
+    func batchMoveDocuments() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let a = try await store.createDocument(title: "A", records: makeRecords(1))
+        let b = try await store.createDocument(title: "B", records: makeRecords(1))
+        let folderID = try await store.createFolder(name: "Facturas")
+
+        try await store.moveDocuments([a, b], toFolder: folderID)
+
+        let context = ModelContext(container)
+        let folder = try #require(
+            try context.fetch(FetchDescriptor<ScanFolder>(predicate: #Predicate { $0.id == folderID })).first
+        )
+        #expect(Set(folder.documents.map(\.id)) == Set([a, b]))
+    }
+
+    @Test("setOCRFailed marca la página y un OCR posterior con éxito lo limpia")
+    func ocrFailedFlag() async throws {
+        let container = try ModelContainer.nitidoInMemory()
+        let store = DocumentStore(modelContainer: container)
+        let records = makeRecords(1)
+        let pageID = records[0].pageID
+        let documentID = try await store.createDocument(title: "Contrato", records: records)
+
+        try await store.setOCRFailed(pageID, in: documentID)
+        let context = ModelContext(container)
+        func page() throws -> ScanPage {
+            try #require(try context.fetch(FetchDescriptor<ScanPage>(predicate: #Predicate { $0.id == pageID })).first)
+        }
+        #expect(try page().ocrFailed == true)
+
+        try await store.setOCRResult(PageOCRUpdate(pageID: pageID, text: "hola", boxes: []), in: documentID)
+        #expect(try page().ocrFailed == false)
+    }
+
     @Test("el OCR de una página recalcula el texto de búsqueda del documento")
     func setOCRResultRecomputesSearchText() async throws {
         let container = try ModelContainer.nitidoInMemory()

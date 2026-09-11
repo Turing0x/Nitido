@@ -57,6 +57,9 @@ struct ExportView: View {
 
     init(documentID: UUID) {
         self.documentID = documentID
+        let stored = UserDefaults.standard.string(forKey: "settings.exportCompression")
+            .flatMap(PDFCompressionLevel.init(rawValue:)) ?? .high
+        _compressionLevel = State(initialValue: stored)
     }
 
     var body: some View {

@@ -13,6 +13,7 @@ struct RootView: View {
 
     @Environment(\.colorScheme) private var scheme
     @Environment(AppRouter.self) private var router
+    @Environment(ScanCoordinator.self) private var coordinator
     @State private var selectedTab: AppTab = .documents
     @State private var isShowingStartupError = false
 
@@ -60,6 +61,10 @@ struct RootView: View {
         )
         .task {
             isShowingStartupError = startupError != nil
+        }
+        .task {
+            // Purga en segundo plano al arrancar, no bloquea el primer frame.
+            await coordinator.purgeExpiredTrash()
         }
     }
 }

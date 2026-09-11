@@ -180,7 +180,31 @@ struct DocumentDetailView: View {
                 pagePreview(page)
             }
             .buttonStyle(.plain)
+            .overlay(alignment: .topTrailing) {
+                if page.ocrFailed {
+                    ocrRetryBadge(page)
+                }
+            }
         }
+    }
+
+    /// El reconocimiento de esta página falló (ver comentario de cabecera de
+    /// `ScanCoordinator.runOCR`): se enseña en la ficha en vez de dejarlo en
+    /// silencio, con un botón para reintentar sin entrar al editor.
+    private func ocrRetryBadge(_ page: ScanPage) -> some View {
+        Button {
+            coordinator.retryOCR(pageID: page.id, documentID: documentID)
+        } label: {
+            Image(systemName: "arrow.clockwise.circle.fill")
+                .font(.title3)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, DS.ColorToken.destructive(scheme))
+        }
+        .padding(DS.Spacing.x2)
+        .accessibilityLabel(String(
+            localized: "page.ocrFailed.retry",
+            defaultValue: "No se pudo reconocer el texto. Toca para reintentar."
+        ))
     }
 
     private func pagePreview(_ page: ScanPage) -> some View {

@@ -233,6 +233,66 @@ protección con contraseña), **59 en total, todos en verde**.
   JPEG aunque el formato elegido sea PNG (sin pérdida, más pesado); es una
   aproximación deliberada, documentada en el código.
 
+## Sprint 5 — Organización y calidad de vida (en curso, sin accesibilidad)
+
+Carpetas: crear/renombrar/borrar (`FoldersView`), mover documento
+(`FolderMoveMenu`) y vista de carpeta (`FolderDetailView`) — hecho en un
+commit anterior a esta sesión.
+
+**Papelera con purga automática.** `DocumentStore.expiredTrash(before:)` +
+`permanentlyDelete(_:)`; `ScanCoordinator.purgeExpiredTrash()` se llama una
+vez al arrancar desde `RootView.task`, sin bloquear el primer frame, y borra
+del todo (registro y ficheros) lo que lleve más de 30 días en la papelera.
+`TrashView` nueva (`Views/Library/TrashView.swift`), accesible desde Ajustes,
+con restaurar y "eliminar definitivamente" con confirmación.
+
+**Selección múltiple** en `LibraryView`: botón "Seleccionar" en la cuadrícula
+y en la lista, barra de acciones inferior con mover a carpeta
+(`BatchFolderMoveMenu`), papelera en lote y exportación en lote a PDF (varios
+ficheros en un único `ShareLink`, mismo patrón que la exportación de imágenes
+de la Sprint 4). `DocumentStore.moveToTrash(_ ids:)` y
+`moveDocuments(_ ids:toFolder:)` hacen el cambio en un único `save`.
+
+**Favoritos**: ya estaban completos desde antes (toggle + filtro "Solo
+favoritos" en `LibraryView`); no hizo falta tocar nada.
+
+**Ajustes** (`SettingsView`) gana tres preferencias y una acción:
+
+- Idioma del OCR (Automático/Español/Inglés) — `OCRLanguagePreference`, en
+  `TextRecognizer.swift`. `TextRecognizer.recognize` acepta ahora `languages`
+  y `automaticallyDetectsLanguage`, con los valores de siempre como default.
+- Filtro por defecto para páginas capturadas con la cámara (sin cuadrilátero
+  detectado, que solo pasa en Fotos/Archivos): `PageIngestor.ingest` acepta
+  `defaultFilter`, `ScanCoordinator` lo lee de `UserDefaults` (no `@AppStorage`
+  directo: no combina con `@Observable`) y lo pasa al ingest.
+- Calidad de exportación por defecto: `ExportView` y la exportación en lote
+  de la biblioteca leen `settings.exportCompression` en vez de tener `.high`
+  fijo.
+- "Regenerar miniaturas": `ScanCoordinator.regenerateThumbnails()` recorre
+  `DocumentStore.allThumbnailTargets()` y rehace cada miniatura desde su
+  procesado.
+
+Enlace a política de privacidad: **no añadido** — no hay URL real en el
+repo ni se ha inventado una; el texto explicativo se deja como estaba.
+
+**OCR: fallo visible y reintento.** `ScanPage.ocrFailed` (nuevo campo) se
+pone a `true` en el `catch` de `ScanCoordinator.runOCR` en vez de tragarse el
+error en silencio, y a `false` en cuanto un reconocimiento tiene éxito.
+`DocumentDetailView` enseña una insignia de aviso sobre la página con el
+texto fallido y un botón que llama a `ScanCoordinator.retryOCR(pageID:documentID:)`.
+
+**68 tests, todos en verde** (11 nuevos: papelera en lote, borrado
+definitivo, expiración por fecha de corte, mover de carpeta en lote, y el
+flag `ocrFailed`).
+
+### Pendiente de la Sprint 5
+
+- **Accesibilidad completa**, deliberadamente fuera de esta ronda: etiquetas
+  de VoiceOver exhaustivas, verificación con tamaños de Dynamic Type de
+  accesibilidad y con el inspector de accesibilidad.
+- Enlace real a política de privacidad (falta la URL).
+- Verificación en dispositivo físico de todo lo de esta sprint.
+
 ## Decisiones cerradas (26/08/2026)
 
 - **Cámara: VisionKit, sin discusión.** `VNDocumentCameraViewController` con su
