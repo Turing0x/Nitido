@@ -18,6 +18,23 @@
         }
       }
     },
+    "common.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerrar"
+          }
+        }
+      }
+    },
     "common.create": {
       "extractionState": "manual",
       "localizations": {
@@ -885,6 +902,74 @@
         }
       }
     },
+    "export.pdfOptions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF options"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opciones de PDF"
+          }
+        }
+      }
+    },
+    "export.textLayer.locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The PDF will come out as an image. With Nítido Pro it carries the recognized text inside and can be searched from any viewer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El PDF saldrá como imagen. Con Nítido Pro lleva dentro el texto reconocido y se puede buscar desde cualquier visor."
+          }
+        }
+      }
+    },
+    "export.textLayer.off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The PDF will come out as an image, with no text to search or select."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El PDF saldrá como imagen, sin texto que se pueda buscar ni seleccionar."
+          }
+        }
+      }
+    },
+    "export.textLayer.toggle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searchable text layer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capa de texto buscable"
+          }
+        }
+      }
+    },
     "export.title": {
       "extractionState": "manual",
       "localizations": {
@@ -1497,6 +1582,23 @@
         }
       }
     },
+    "library.selection.export": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the selection"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar la selección"
+          }
+        }
+      }
+    },
     "library.sort": {
       "extractionState": "manual",
       "localizations": {
@@ -1605,6 +1707,23 @@
           "stringUnit": {
             "state": "new",
             "value": "¿Eliminar página?"
+          }
+        }
+      }
+    },
+    "page.ocrDeferred": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not recognized: this month's pages have run out. It will be recognized on its own when next month starts."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin reconocer: se han agotado las páginas del mes. Se reconocerá sola cuando empiece el mes que viene."
           }
         }
       }
@@ -1853,24 +1972,75 @@
         }
       }
     },
-    "paywall.empty.description": {
+    "paywall.active.lifetime": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The paywall ships in Sprint 6."
+            "value": "You bought it for good. There's nothing to renew and nothing to cancel."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El paywall se implementa en la Sprint 6."
+            "value": "Lo compraste para siempre. No hay nada que renovar ni que cancelar."
           }
         }
       }
     },
-    "paywall.empty.title": {
+    "paywall.active.subscription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can manage or cancel the subscription in iOS Settings, under your App Store account."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puedes gestionar o cancelar la suscripción en Ajustes de iOS, dentro de tu cuenta de App Store."
+          }
+        }
+      }
+    },
+    "paywall.active.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You already have Nítido Pro"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya tienes Nítido Pro"
+          }
+        }
+      }
+    },
+    "paywall.eyebrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All on your iPhone"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo en tu iPhone"
+          }
+        }
+      }
+    },
+    "paywall.headline": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1883,6 +2053,125 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nítido Pro"
+          }
+        }
+      }
+    },
+    "paywall.lifetime.caption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, a single payment"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, un solo pago"
+          }
+        }
+      }
+    },
+    "paywall.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Política de privacidad"
+          }
+        }
+      }
+    },
+    "paywall.renewalTerms": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The yearly subscription renews by itself every year until you cancel it. If you start with the free trial, the first year is charged when the seven days end, unless you cancel before that. You can cancel whenever you want from iOS Settings, under your App Store account, and doing it at least 24 hours before the current period ends is enough. The lifetime purchase is a single payment and never renews."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La suscripción anual se renueva sola cada año hasta que la canceles. Si empiezas con la prueba gratuita, se cobra el primer año al terminar los siete días, salvo que canceles antes. Puedes cancelar cuando quieras desde Ajustes de iOS, en tu cuenta de App Store, y basta con hacerlo al menos 24 horas antes de que acabe el periodo en curso. La compra de por vida es un pago único y no se renueva nunca."
+          }
+        }
+      }
+    },
+    "paywall.restore": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore purchases"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar compras"
+          }
+        }
+      }
+    },
+    "paywall.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load the plans again"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a cargar los planes"
+          }
+        }
+      }
+    },
+    "paywall.subheadline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No account, no ads, and your documents still never leave the device. The only thing that changes is that the limits go away."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin cuenta, sin anuncios y sin que tus documentos salgan del dispositivo. Lo único que cambia es que se quitan los límites."
+          }
+        }
+      }
+    },
+    "paywall.terms": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of Use"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Términos de uso"
           }
         }
       }
@@ -1904,6 +2193,448 @@
         }
       }
     },
+    "paywall.yearly.caption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ per year"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ al año"
+          }
+        }
+      }
+    },
+    "paywall.yearly.trial": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld days free, then %@ per year"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld días gratis, luego %@ al año"
+          }
+        }
+      }
+    },
+    "pro.badge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro"
+          }
+        }
+      }
+    },
+    "pro.feature.batchExport.explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select several documents and export them all in one go instead of one at a time."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecciona varios documentos y expórtalos todos de una vez, en lugar de ir uno por uno."
+          }
+        }
+      }
+    },
+    "pro.feature.batchExport.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export several documents at once"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar varios documentos a la vez"
+          }
+        }
+      }
+    },
+    "pro.feature.manualOCRLanguage.explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pin the recognition language instead of letting it be detected. It makes a difference on short documents and on ones that mix two languages."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fija el idioma del reconocimiento en vez de dejar que se detecte solo. Se nota en documentos cortos y en los que mezclan dos idiomas."
+          }
+        }
+      }
+    },
+    "pro.feature.manualOCRLanguage.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the recognition language"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir el idioma del reconocimiento"
+          }
+        }
+      }
+    },
+    "pro.feature.pdfPassword.explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Put a password on the PDF before sharing it. Anyone without it can't open the file."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pon una contraseña al PDF antes de compartirlo. Quien no la tenga no puede abrirlo."
+          }
+        }
+      }
+    },
+    "pro.feature.pdfPassword.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password-protected PDF"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF protegido con contraseña"
+          }
+        }
+      }
+    },
+    "pro.feature.searchablePDF.explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The PDF carries the recognized text inside it, invisible and placed over the image. You can search and select it like a typed document, from your computer too."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El PDF lleva dentro el texto reconocido, invisible y colocado sobre la imagen. Se puede buscar y seleccionar como si fuera un documento escrito, también desde el ordenador."
+          }
+        }
+      }
+    },
+    "pro.feature.searchablePDF.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searchable PDF text"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF con texto buscable"
+          }
+        }
+      }
+    },
+    "pro.feature.unlimitedOCR.explanation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognize the text on as many pages as you like. The free plan recognizes fifteen a month."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconoce el texto de todas las páginas que quieras. El plan gratuito reconoce quince al mes."
+          }
+        }
+      }
+    },
+    "pro.feature.unlimitedOCR.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlimited text recognition"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconocimiento de texto sin límite"
+          }
+        }
+      }
+    },
+    "pro.gate.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A Nítido Pro feature. Tap to find out what it does."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Función de Nítido Pro. Toca para saber qué hace."
+          }
+        }
+      }
+    },
+    "pro.gate.notNow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
+          }
+        }
+      }
+    },
+    "pro.gate.see": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See Nítido Pro"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver Nítido Pro"
+          }
+        }
+      }
+    },
+    "purchase.error.generic": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The App Store operation couldn't be completed. Try again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo completar la operación con App Store. Inténtalo de nuevo."
+          }
+        }
+      }
+    },
+    "purchase.error.network": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There's no connection to the App Store. Try again when you're back online."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay conexión con App Store. Inténtalo otra vez cuando vuelvas a tener red."
+          }
+        }
+      }
+    },
+    "purchase.error.noProducts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The plans can't be loaded right now. Try again in a little while."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora mismo no se pueden cargar los planes. Vuelve a intentarlo en un rato."
+          }
+        }
+      }
+    },
+    "purchase.error.notAllowed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device isn't allowed to make purchases. Check Screen Time in Settings."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no tiene permiso para hacer compras. Míralo en Ajustes, dentro de Tiempo de uso."
+          }
+        }
+      }
+    },
+    "purchase.error.nothingToRestore": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We couldn't find any previous purchase with this Apple Account."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hemos encontrado ninguna compra anterior con este ID de Apple."
+          }
+        }
+      }
+    },
+    "purchase.error.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The purchase is waiting for approval. It will activate on its own once it's approved."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La compra está pendiente de aprobación. Se activará sola en cuanto se apruebe."
+          }
+        }
+      }
+    },
+    "purchase.error.storefront": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nítido Pro isn't available in your country's store."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nítido Pro no está disponible en la tienda de tu país."
+          }
+        }
+      }
+    },
+    "purchase.error.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't complete"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo completar"
+          }
+        }
+      }
+    },
+    "purchase.error.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This plan isn't available right now."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este plan no está disponible ahora mismo."
+          }
+        }
+      }
+    },
+    "purchase.error.verification": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The purchase couldn't be verified with the App Store, so nothing was activated. You haven't been charged."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La compra no se pudo verificar con App Store, así que no se ha activado nada. No se te ha cobrado."
+          }
+        }
+      }
+    },
     "recognizedText.copy": {
       "extractionState": "manual",
       "localizations": {
@@ -1917,6 +2648,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copiar"
+          }
+        }
+      }
+    },
+    "recognizedText.deferred.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The pages the free plan recognizes each month have run out. This one will be recognized on its own when the next one starts, or right away if you go Pro."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se han agotado las páginas que el plan gratuito reconoce cada mes. Esta se reconocerá sola cuando empiece el siguiente, o al momento si te haces Pro."
+          }
+        }
+      }
+    },
+    "recognizedText.deferred.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for next month"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando al mes que viene"
           }
         }
       }
@@ -2148,13 +2913,115 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nítido never uses the network. All processing happens on this device."
+            "value": "Your documents never leave this device: all processing happens here and Nítido doesn't send them anywhere. The only connection there is, is the one the system makes with the App Store when you buy."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nítido no usa la red. Todo el procesado ocurre en este dispositivo."
+            "value": "Tus documentos no salen de este dispositivo: todo el procesado ocurre aquí y Nítido no los envía a ninguna parte. La única conexión que existe es la que hace el sistema con App Store cuando compras."
+          }
+        }
+      }
+    },
+    "settings.pro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nítido Pro"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nítido Pro"
+          }
+        }
+      }
+    },
+    "settings.pro.active": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activo"
+          }
+        }
+      }
+    },
+    "settings.pro.deferred": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There are %lld pages waiting for next month to start. They'll be recognized on their own, or right away if you go Pro."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hay %lld páginas esperando a que empiece el mes que viene. Se reconocerán solas, o al momento si te haces Pro."
+          }
+        }
+      }
+    },
+    "settings.pro.monthlyOCR": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pages recognized this month"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Páginas reconocidas este mes"
+          }
+        }
+      }
+    },
+    "settings.pro.monthlyOCR.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld de %lld"
+          }
+        }
+      }
+    },
+    "settings.pro.see": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See plans"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver planes"
           }
         }
       }
@@ -2189,6 +3056,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Espacio ocupado"
+          }
+        }
+      }
+    },
+    "settings.subscription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subscription"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suscripción"
           }
         }
       }

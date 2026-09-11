@@ -293,6 +293,114 @@ flag `ocrFailed`).
 - Enlace real a política de privacidad (falta la URL).
 - Verificación en dispositivo físico de todo lo de esta sprint.
 
+## Sprint 6 — Monetización (sin verificar en Xcode)
+
+**Escrita entera en un contenedor Linux, sin Xcode ni toolchain de Swift: no
+está compilada ni ejecutada.** Todo lo de abajo necesita pasar por
+`xcodegen generate && xcodebuild … test` en el Mac antes de darlo por bueno.
+
+### Piezas nuevas (`Nitido/Purchases/`)
+
+- **`OCRQuota`**: `struct Sendable` puro con la aritmética del contador
+  mensual. Recibe estado y fecha, devuelve estado nuevo; ni `UserDefaults` ni
+  StoreKit dentro. Es lo que de verdad se prueba.
+- **`StoreManager`**: `@MainActor @Observable`, mismo molde que
+  `ScanCoordinator`. Catálogo con `Product.products(for:)`, compra con
+  `purchase()`, derechos con `Transaction.currentEntitlements` y escucha
+  permanente de `Transaction.updates` arrancada desde su `init`. El estado Pro
+  se cachea en `UserDefaults` (`purchases.isPro`) solo para que el primer
+  fotograma salga correcto: `currentEntitlements` ya responde sin red, así que
+  el modo avión funciona por sí solo.
+- **`Entitlements`**: el único sitio que decide qué está permitido. Depende de
+  `ProStateProviding` —protocolo, con `StoreManager` como implementación— para
+  que los gates se puedan probar sin levantar la tienda.
+
+### Reparto de gratis y Pro
+
+Los cinco gates de la sección 11 del HANDOFF, enganchados donde corresponde:
+
+| Gate | Dónde |
+|---|---|
+| OCR ilimitado | `ScanCoordinator.runOCR`, consumo por página |
+| Idioma manual de OCR | `ScanCoordinator.ocrLanguagePreference` + `SettingsView` |
+| PDF buscable | `PDFExportOptions.includesTextLayer` + `ExportView` |
+| Contraseña de PDF | `ExportView`, con `exportsPassword` |
+| Exportación por lotes | `LibraryView.selectionActionBar` y `exportSelection()` |
+
+Los dos gates de exportación se aplican con propiedades calculadas
+(`exportsTextLayer`, `exportsPassword`) en vez de tocando el `@State`: así
+basta con que caduque la suscripción para que el interruptor vuelva a su sitio
+y el fichero salga como toca, sin depender de haber limpiado ninguna
+preferencia guardada.
+
+### Decisiones de producto de esta sprint
+
+- **La cuota se cobra una vez por página.** `ScanPage.ocrCounted` se marca en
+  el primer reconocimiento; reintentar tras un fallo o rehacer las cajas tras
+  recortar no vuelve a descontar. Recortar una factura no debe costarte el mes.
+- **Cuando se agota a mitad de un lote, se reconocen las páginas que quepan** y
+  el resto se marcan con `ScanPage.ocrDeferred`. Vuelven solas al empezar el
+  mes (`ScanCoordinator.resumeDeferredOCR`, llamado desde `RootView`) o al
+  comprar Pro. Los documentos se reanudan de uno en uno, esperando a cada lote:
+  lanzarlos a la vez reventaría la memoria por la misma razón por la que el
+  bucle de `runOCR` es secuencial.
+- **El paywall no se abre solo.** Tocar un control de pago muestra un aviso con
+  lo que hace esa función, y solo el botón explícito presenta la hoja.
+- **El interruptor de capa de texto es nuevo.** Antes la capa se generaba
+  siempre y no había forma de saber qué llevaba dentro el PDF.
+
+Los dos campos nuevos de `ScanPage` llevan valor por defecto, como el resto del
+modelo, así que la migración sigue siendo ligera: no hace falta
+`VersionedSchema` ni `MigrationPlan`, ni tocar `Schema.nitido`.
+
+### Reloj y cuota
+
+`OCRQuota.rolledOver(to:)` solo reinicia cuando el mes avanza de verdad. Si la
+fecha del sistema va hacia atrás, ni se pone a cero el contador ni retrocede
+`periodStart`. Adelantar el reloj sí concede un reinicio, pero deja
+`periodStart` en el futuro y volver atrás no concede otro. Sin red no hay reloj
+de confianza al que preguntar; lo que se cierra es el caso fácil y repetible.
+
+### Fichero `.storekit`
+
+`Nitido/Resources/Nitido.storekit`, con el anual (P1Y, 12,99, oferta
+introductoria `free`/`P1W`) y el vitalicio (`NonConsumable`, 29,99). En
+`project.yml` se declara en `schemes.Nitido.run.storeKitConfiguration` y se
+excluye de `sources`, porque con `sources: - path: Nitido` cualquier fichero
+que no sea Swift acabaría copiado dentro del bundle. **Xcode puede normalizar
+el JSON la primera vez que lo abra**; es esperable.
+
+### Texto de privacidad
+
+`settings.privacy.claim` decía "Nítido no usa la red". Con StoreKit eso deja de
+ser literalmente cierto, así que ahora dice que los documentos no salen del
+dispositivo y que la única conexión es la del sistema con App Store al comprar.
+Sigue siendo la afirmación fuerte que era, y además es verdad.
+
+### Tests
+
+18 nuevos, todos sin red ni StoreKit: la aritmética de `OCRQuota` (incluido el
+retraso de reloj), los gates de `Entitlements`, el marcado de páginas contadas
+y aplazadas en `DocumentStore`, y un PDF exportado sin capa de texto que
+efectivamente no se puede buscar.
+
+### Pendiente de la Sprint 6
+
+- **Compilar y pasar los tests en el Mac.** Nada de esto se ha ejecutado.
+- **Comprobación manual del ciclo completo**: comprar anual y vitalicio con el
+  `.storekit`, cerrar, reinstalar, restaurar y recuperar Pro; agotar la cuota y
+  ver que las páginas aplazadas vuelven solas.
+- **URLs reales de términos de uso y política de privacidad**
+  (`LegalLinks`, en `PaywallView.swift`, tiene marcadores de posición). App
+  Review rechaza cualquier paywall con suscripción que no enlace a las dos.
+- **Alta de los dos productos en App Store Connect** con los identificadores
+  exactos, para poder probar en sandbox.
+- **22 claves de la Sprint 5 no están en el catálogo** (`trash.*`,
+  `settings.trash`, `settings.scanning`, `settings.ocrLanguage`,
+  `library.select`, `page.ocrFailed.retry`, `common.done`…). No son de esta
+  sprint, pero significan que una instalación en inglés las enseña en español.
+  Las de la Sprint 6 sí van con español e inglés.
+
 ## Decisiones cerradas (26/08/2026)
 
 - **Cámara: VisionKit, sin discusión.** `VNDocumentCameraViewController` con su
