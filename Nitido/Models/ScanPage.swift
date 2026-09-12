@@ -29,6 +29,14 @@ final class ScanPage {
     /// intentado" de "se intentó y no encontró texto", que en ambos casos
     /// deja `ocrText` vacío pero no debe ofrecer reintentar).
     var ocrFailed: Bool = false
+    /// La página ya gastó su unidad de la cuota mensual del plan gratuito.
+    /// Se marca en el primer reconocimiento y no se vuelve a mirar: reintentar
+    /// tras un fallo, o rehacer las cajas tras recortar, no cuesta cuota.
+    var ocrCounted: Bool = false
+    /// Se quedó sin reconocer porque la cuota del mes estaba agotada. Distinto
+    /// de `ocrFailed`, que es un error de verdad: esto se resuelve solo al
+    /// empezar el mes siguiente o al comprar Pro.
+    var ocrDeferred: Bool = false
 
     var document: ScanDocument?
 

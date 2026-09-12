@@ -11,6 +11,7 @@ struct ExportView: View {
     let documentID: UUID
 
     @Environment(ScanCoordinator.self) private var coordinator
+    @Environment(Entitlements.self) private var entitlements
     @Environment(\.fileStore) private var fileStore
     @Environment(\.colorScheme) private var scheme
 
@@ -46,6 +47,8 @@ struct ExportView: View {
     @State private var selectedPageID: UUID?
     @State private var isPasswordProtected = false
     @State private var password = ""
+    @State private var includesTextLayer = true
+    @State private var requestedFeature: ProFeature?
 
     @State private var exportInfo: DocumentExportInfo?
     @State private var loadError: String?
@@ -80,6 +83,7 @@ struct ExportView: View {
         .dsScreenBackground()
         .navigationTitle(String(localized: "export.title", defaultValue: "Exportar"))
         .navigationBarTitleDisplayMode(.inline)
+        .proFeatureNotice($requestedFeature)
         .task { await loadExportInfo() }
         .task(id: estimationKey) { await recomputeEstimatedSize() }
         .onChange(of: optionsSignature) {
@@ -101,7 +105,20 @@ struct ExportView: View {
 
     /// Firma de todas las opciones que cambian el fichero exportado.
     private var optionsSignature: String {
-        "\(format.rawValue)-\(pageSizeMode.rawValue)-\(compressionLevel.rawValue)-\(pageSelectionMode.rawValue)-\(selectedPageID?.uuidString ?? "")-\(isPasswordProtected)-\(password)"
+        "\(format.rawValue)-\(pageSizeMode.rawValue)-\(compressionLevel.rawValue)-\(pageSelectionMode.rawValue)-\(selectedPageID?.uuidString ?? "")-\(exportsPassword)-\(password)-\(exportsTextLayer)"
+    }
+
+    /// Lo que de verdad va a llevar el PDF, ya con el gate aplicado.
+    ///
+    /// Se calcula aquí en vez de tocar el `@State` para que baste con caducar
+    /// la suscripción: el interruptor vuelve solo a su sitio y el fichero sale
+    /// como corresponde, sin depender de haber limpiado nada.
+    private var exportsTextLayer: Bool {
+        entitlements.allows(.searchablePDF) && includesTextLayer
+    }
+
+    private var exportsPassword: Bool {
+        entitlements.allows(.pdfPassword) && isPasswordProtected
     }
 
     @ViewBuilder
@@ -173,13 +190,43 @@ struct ExportView: View {
 
             if format == .pdf {
                 Section {
-                    Toggle(
-                        String(localized: "export.password.toggle", defaultValue: "Proteger con contraseña"),
-                        isOn: $isPasswordProtected
-                    )
+                    Toggle(isOn: Binding(get: { exportsTextLayer }, set: { includesTextLayer = $0 })) {
+                        ProRowLabel(
+                            title: String(localized: "export.textLayer.toggle", defaultValue: "Capa de texto buscable"),
+                            isAllowed: entitlements.allows(.searchablePDF)
+                        )
+                    }
+                    .proGated(.searchablePDF, isAllowed: entitlements.allows(.searchablePDF)) {
+                        requestedFeature = $0
+                    }
                     .listRowBackground(DS.ColorToken.card(scheme))
 
-                    if isPasswordProtected {
+                    if !exportsTextLayer {
+                        // Se avisa antes de exportar, no después: "por qué no
+                        // puedo buscar dentro de mi PDF" es justo la pregunta
+                        // que no debería tener que hacerse nadie.
+                        Text(entitlements.allows(.searchablePDF)
+                             ? String(localized: "export.textLayer.off",
+                                      defaultValue: "El PDF saldrá como imagen, sin texto que se pueda buscar ni seleccionar.")
+                             : String(localized: "export.textLayer.locked",
+                                      defaultValue: "El PDF saldrá como imagen. Con Nítido Pro lleva dentro el texto reconocido y se puede buscar desde cualquier visor."))
+                            .font(DS.Typography.captionText)
+                            .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
+                            .listRowBackground(DS.ColorToken.card(scheme))
+                    }
+
+                    Toggle(isOn: Binding(get: { exportsPassword }, set: { isPasswordProtected = $0 })) {
+                        ProRowLabel(
+                            title: String(localized: "export.password.toggle", defaultValue: "Proteger con contraseña"),
+                            isAllowed: entitlements.allows(.pdfPassword)
+                        )
+                    }
+                    .proGated(.pdfPassword, isAllowed: entitlements.allows(.pdfPassword)) {
+                        requestedFeature = $0
+                    }
+                    .listRowBackground(DS.ColorToken.card(scheme))
+
+                    if exportsPassword {
                         SecureField(
                             String(localized: "export.password.field", defaultValue: "Contraseña"),
                             text: $password
@@ -196,6 +243,10 @@ struct ExportView: View {
                             .listRowBackground(DS.ColorToken.card(scheme))
                         }
                     }
+                } header: {
+                    Text(String(localized: "export.pdfOptions", defaultValue: "Opciones de PDF"))
+                        .dsEyebrow()
+                        .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
                 }
             }
 
@@ -259,7 +310,7 @@ struct ExportView: View {
     /// sin cifrar que el usuario creía protegido.
     private var isExportDisabled: Bool {
         if format != .pdf && pageSelectionMode == .single && selectedPageID == nil { return true }
-        if format == .pdf && isPasswordProtected && password.isEmpty { return true }
+        if format == .pdf && exportsPassword && password.isEmpty { return true }
         return false
     }
 
@@ -334,10 +385,14 @@ struct ExportView: View {
         do {
             switch format {
             case .pdf:
-                let options = PDFExportOptions(pageSizeMode: pageSizeMode, compressionLevel: compressionLevel)
+                let options = PDFExportOptions(
+                    pageSizeMode: pageSizeMode,
+                    compressionLevel: compressionLevel,
+                    includesTextLayer: exportsTextLayer
+                )
                 // `nil` = no se pidió protección. Nunca "" — ver
                 // `PDFPasswordProtector.protect`.
-                let protectionPassword: String? = isPasswordProtected ? password : nil
+                let protectionPassword: String? = exportsPassword ? password : nil
                 let fileName = "\(ImageExporter.sanitize(info.title)).pdf"
                 // La escritura va dentro de la misma tarea que genera los bytes:
                 // un PDF de decenas de megabytes escrito desde el `MainActor`

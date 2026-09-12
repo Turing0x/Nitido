@@ -21,15 +21,21 @@ struct PDFExportOptions: Sendable {
     /// dentro de `PDFExporter` en vez de cruzar la frontera de actor como
     /// valor. Nunca se activa en release.
     var useDebugTextColor: Bool = false
+    /// Dibujar o no la capa de texto invisible. Es lo que separa un PDF
+    /// buscable de una imagen dentro de un PDF, y es función de Nítido Pro.
+    /// Quien decide es `Entitlements`; aquí solo se obedece.
+    var includesTextLayer: Bool = true
 
     init(
         pageSizeMode: PDFPageSizeMode = .fitToImage,
         compressionLevel: PDFCompressionLevel = .high,
-        useDebugTextColor: Bool = false
+        useDebugTextColor: Bool = false,
+        includesTextLayer: Bool = true
     ) {
         self.pageSizeMode = pageSizeMode
         self.compressionLevel = compressionLevel
         self.useDebugTextColor = useDebugTextColor
+        self.includesTextLayer = includesTextLayer
     }
 }
 
@@ -156,6 +162,7 @@ enum PDFExporter {
 
             UIImage(cgImage: raster).draw(in: geometry.imageRect)
 
+            guard options.includesTextLayer else { return }
             for box in page.ocrBoxes where !box.text.isEmpty {
                 drawInvisibleText(box, in: geometry.imageRect, cgContext: cgContext, useDebugColor: options.useDebugTextColor)
             }

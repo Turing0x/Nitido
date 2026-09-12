@@ -24,6 +24,8 @@ struct NitidoApp: App {
                 RootView(startupError: services.startupError)
                     .environment(\.fileStore, services.fileStore)
                     .environment(services.scanCoordinator)
+                    .environment(services.storeManager)
+                    .environment(services.entitlements)
                     .environment(router)
                     .modelContainer(services.modelContainer)
             } else {
@@ -55,6 +57,8 @@ struct AppServices {
     let fileStore: any FileStoring
     let modelContainer: ModelContainer
     let scanCoordinator: ScanCoordinator
+    let storeManager: StoreManager
+    let entitlements: Entitlements
     /// Si el almacenamiento en disco falla se arranca en memoria para que la
     /// app siga siendo usable, pero el error se enseña; no se traga en silencio.
     let startupError: String?
@@ -63,12 +67,7 @@ struct AppServices {
         do {
             let store = try LocalFileStore.makeDefault()
             let container = try ModelContainer.nitido(storeDirectory: store.root)
-            return .ready(AppServices(
-                fileStore: store,
-                modelContainer: container,
-                scanCoordinator: ScanCoordinator(modelContainer: container, fileStore: store),
-                startupError: nil
-            ))
+            return .ready(make(fileStore: store, modelContainer: container, startupError: nil))
         } catch {
             return inMemoryFallback(after: error)
         }
@@ -81,15 +80,39 @@ struct AppServices {
         let store = LocalFileStore(containerRoot: .temporaryDirectory)
         do {
             let container = try ModelContainer.nitidoInMemory()
-            return .ready(AppServices(
+            return .ready(make(
                 fileStore: store,
                 modelContainer: container,
-                scanCoordinator: ScanCoordinator(modelContainer: container, fileStore: store),
                 startupError: diskError.localizedDescription
             ))
         } catch {
             return .failed("\(diskError.localizedDescription)\n\n\(error.localizedDescription)")
         }
+    }
+
+    /// Monta el grafo, y el orden importa: `Entitlements` necesita el estado de
+    /// compra, y el coordinador necesita preguntar qué está permitido antes de
+    /// reconocer una página. Las dos ramas de arranque comparten este montaje
+    /// para que no se puedan ir separando con el tiempo.
+    private static func make(
+        fileStore: any FileStoring,
+        modelContainer: ModelContainer,
+        startupError: String?
+    ) -> AppServices {
+        let storeManager = StoreManager()
+        let entitlements = Entitlements(storeManager: storeManager)
+        return AppServices(
+            fileStore: fileStore,
+            modelContainer: modelContainer,
+            scanCoordinator: ScanCoordinator(
+                modelContainer: modelContainer,
+                fileStore: fileStore,
+                entitlements: entitlements
+            ),
+            storeManager: storeManager,
+            entitlements: entitlements,
+            startupError: startupError
+        )
     }
 }
 

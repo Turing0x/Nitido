@@ -4,12 +4,17 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.fileStore) private var fileStore
     @Environment(ScanCoordinator.self) private var coordinator
+    @Environment(StoreManager.self) private var storeManager
+    @Environment(Entitlements.self) private var entitlements
     @Environment(\.colorScheme) private var scheme
     @Query(filter: #Predicate<ScanDocument> { $0.deletedAt != nil }) private var trashedDocuments: [ScanDocument]
 
     @State private var sizeOnDisk: Int64?
     @State private var isRegeneratingThumbnails = false
     @State private var regeneratedCount: Int?
+    @State private var isShowingPaywall = false
+    @State private var requestedFeature: ProFeature?
+    @State private var deferredPageCount = 0
 
     @AppStorage("settings.ocrLanguage") private var ocrLanguageRaw = OCRLanguagePreference.automatic.rawValue
     @AppStorage("settings.defaultFilter") private var defaultFilterRaw = PageFilter.original.rawValue
@@ -23,14 +28,23 @@ struct SettingsView: View {
 
     var body: some View {
         List {
+            proSection
+
             Section {
                 Picker(
-                    String(localized: "settings.ocrLanguage", defaultValue: "Idioma del OCR"),
                     selection: $ocrLanguageRaw
                 ) {
                     ForEach(OCRLanguagePreference.allCases) { option in
                         Text(option.displayName).tag(option.rawValue)
                     }
+                } label: {
+                    ProRowLabel(
+                        title: String(localized: "settings.ocrLanguage", defaultValue: "Idioma del OCR"),
+                        isAllowed: entitlements.allows(.manualOCRLanguage)
+                    )
+                }
+                .proGated(.manualOCRLanguage, isAllowed: entitlements.allows(.manualOCRLanguage)) {
+                    requestedFeature = $0
                 }
                 .listRowBackground(DS.ColorToken.card(scheme))
 
@@ -101,7 +115,7 @@ struct SettingsView: View {
 
                 Text(String(
                     localized: "settings.privacy.claim",
-                    defaultValue: "Nítido no usa la red. Todo el procesado ocurre en este dispositivo."
+                    defaultValue: "Tus documentos no salen de este dispositivo: todo el procesado ocurre aquí y Nítido no los envía a ninguna parte. La única conexión que existe es la que hace el sistema con App Store cuando compras."
                 ))
                 .font(DS.Typography.calloutText)
                 .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
@@ -115,8 +129,90 @@ struct SettingsView: View {
         .listStyle(.insetGrouped)
         .dsScreenBackground()
         .navigationTitle(String(localized: "settings.title", defaultValue: "Ajustes"))
+        .proFeatureNotice($requestedFeature)
+        .sheet(isPresented: $isShowingPaywall) {
+            NavigationStack { PaywallView() }
+        }
+        .alert(
+            String(localized: "purchase.error.title", defaultValue: "No se pudo completar"),
+            isPresented: Binding(
+                get: { storeManager.errorMessage != nil },
+                set: { if !$0 { storeManager.errorMessage = nil } }
+            )
+        ) {
+            Button(String(localized: "common.ok", defaultValue: "Aceptar"), role: .cancel) {}
+        } message: {
+            Text(storeManager.errorMessage ?? "")
+        }
         .task {
             sizeOnDisk = await Self.measureSizeOnDisk(fileStore)
+        }
+        .task {
+            // El periodo puede haber cambiado con la app abierta desde el mes
+            // pasado; sin esto el contador se vería rancio.
+            entitlements.refreshPeriod()
+            deferredPageCount = await coordinator.deferredOCRPageCount()
+        }
+    }
+
+    // MARK: - Nítido Pro
+
+    @ViewBuilder
+    private var proSection: some View {
+        Section {
+            Button {
+                isShowingPaywall = true
+            } label: {
+                LabeledContent(String(localized: "settings.pro", defaultValue: "Nítido Pro")) {
+                    Text(entitlements.isPro
+                         ? String(localized: "settings.pro.active", defaultValue: "Activo")
+                         : String(localized: "settings.pro.see", defaultValue: "Ver planes"))
+                }
+            }
+            .font(DS.Typography.bodyText)
+            .listRowBackground(DS.ColorToken.card(scheme))
+
+            if !entitlements.isPro {
+                LabeledContent(
+                    String(localized: "settings.pro.monthlyOCR", defaultValue: "Páginas reconocidas este mes")
+                ) {
+                    Text(String(
+                        localized: "settings.pro.monthlyOCR.count",
+                        defaultValue: "\(entitlements.quota.used) de \(OCRQuota.freeMonthlyAllowance)"
+                    ))
+                }
+                .font(DS.Typography.bodyText)
+                .listRowBackground(DS.ColorToken.card(scheme))
+
+                if deferredPageCount > 0 {
+                    Text(String(
+                        localized: "settings.pro.deferred",
+                        defaultValue: "Hay \(deferredPageCount) páginas esperando a que empiece el mes que viene. Se reconocerán solas, o al momento si te haces Pro."
+                    ))
+                    .font(DS.Typography.captionText)
+                    .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
+                    .listRowBackground(DS.ColorToken.card(scheme))
+                }
+            }
+
+            Button {
+                Task { await storeManager.restorePurchases() }
+            } label: {
+                HStack {
+                    Text(String(localized: "paywall.restore", defaultValue: "Restaurar compras"))
+                    Spacer()
+                    if storeManager.phase == .restoring {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+            }
+            .font(DS.Typography.bodyText)
+            .disabled(storeManager.phase.isWorking)
+            .listRowBackground(DS.ColorToken.card(scheme))
+        } header: {
+            Text(String(localized: "settings.subscription", defaultValue: "Suscripción"))
+                .dsEyebrow()
+                .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
         }
     }
 
@@ -155,6 +251,16 @@ struct SettingsView: View {
     }
 }
 
+private struct SettingsPreview: View {
+    @State private var storeManager = StoreManager()
+
+    var body: some View {
+        NavigationStack { SettingsView() }
+            .environment(storeManager)
+            .environment(Entitlements(storeManager: storeManager))
+    }
+}
+
 #Preview {
-    NavigationStack { SettingsView() }
+    SettingsPreview()
 }

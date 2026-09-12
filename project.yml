@@ -23,6 +23,12 @@ targets:
     platform: iOS
     sources:
       - path: Nitido
+        excludes:
+          # Configuración local de compras: la usa el esquema, no la app.
+          # Sin esta exclusión acabaría copiada dentro del bundle, porque
+          # cualquier fichero que no sea Swift bajo `Nitido/` se trata como
+          # recurso.
+          - "Resources/Nitido.storekit"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.threedotsdev.nitido
@@ -58,3 +64,6 @@ schemes:
         - NitidoTests
     run:
       config: Debug
+      # Permite comprar en el simulador y en dispositivo sin subir nada a
+      # App Store Connect.
+      storeKitConfiguration: Nitido/Resources/Nitido.storekit
