@@ -195,10 +195,7 @@ struct LibraryView: View {
     private var grid: some View {
         ScrollView {
             LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: DS.Spacing.x4),
-                    GridItem(.flexible(), spacing: DS.Spacing.x4)
-                ],
+                columns: DS.Layout.adaptiveGridColumns,
                 spacing: DS.Spacing.x5
             ) {
                 ForEach(visibleDocuments) { document in

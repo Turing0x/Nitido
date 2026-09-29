@@ -45,6 +45,8 @@ struct RootView: View {
                 NavigationStack { SettingsView() }
             }
         }
+        // En iPad la barra de pestañas pasa a barra lateral; en iPhone no cambia.
+        .tabViewStyle(.sidebarAdaptable)
         .tint(DS.ColorToken.primary(scheme))
         .onContinueUserActivity(CSSearchableItemActionType) { activity in
             guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,

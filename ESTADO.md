@@ -417,6 +417,19 @@ Compartir → Nítido → documento nuevo abierto y OCR en marcha.
 Límite conocido: desde Fotos no aparece Nítido para imágenes (Fotos usa su
 propia fila de apps); cubre Archivos, Mail, Safari, etc.
 
+### T2 — iPad ✅
+`TARGETED_DEVICE_FAMILY: "1,2"`; orientaciones `~ipad` con las cuatro (iPhone sigue
+solo vertical). `RootView` usa `.tabViewStyle(.sidebarAdaptable)`: en iPad la barra
+de pestañas se puede plegar a barra lateral, en iPhone no cambia. Las tres
+cuadrículas (biblioteca, carpeta, detalle) pasan a `DS.Layout.adaptiveGridColumns`
+(`DesignTokens+Layout.swift`, anchura mínima 2 × `Spacing.x20` = 160 pt, sin valor
+nuevo): iPhone sigue en 2 columnas, iPad 11" vertical muestra 5. 99 tests en verde.
+Verificado en simulador iPad Pro 11" (biblioteca vacía y con datos, detalle) y en
+iPhone. **Sin probar**: giro a horizontal (el simulador no lo permite desde aquí),
+editor de página y exportación en iPad.
+Pendiente menor: el estado vacío dice «este iPhone» también en iPad
+(`library.empty`); se resuelve en T3.
+
 ## Decisiones cerradas (26/08/2026)
 
 - **Cámara: VisionKit, sin discusión.** `VNDocumentCameraViewController` con su
