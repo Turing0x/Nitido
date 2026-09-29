@@ -452,6 +452,16 @@ borde del lienzo, así que la máscara redondeada de iOS recorta un poco arriba 
 abajo. Además parece un icono de un paquete de iconos: comprobar que su licencia
 permite uso comercial en App Store y si exige atribución.
 
+### T5 — Ficha de App Store ✅
+`docs/appstore-listing.md`: nombre, subtítulo, texto promocional, palabras clave,
+descripción y «novedades» en español e inglés (límites de Apple comprobados),
+metadatos, notas para el revisor y guion de 6 capturas. La descripción dice lo que
+la app no hace y trae precio, renovación y enlaces (3.1.2); presenta como Pro el PDF
+buscable y la contraseña, tal como está en el código. Sin código tocado.
+Falta: crear la app y los dos productos en App Store Connect, hacer las capturas
+con la app real y con documentos ficticios (las hace Raúl), y responder el
+cuestionario de clasificación por edad (se propone 4+).
+
 ## Decisiones cerradas (26/08/2026)
 
 - **Cámara: VisionKit, sin discusión.** `VNDocumentCameraViewController` con su
