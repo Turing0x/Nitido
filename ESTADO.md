@@ -397,7 +397,7 @@ efectivamente no se puede buscar.
   exactos, para poder probar en sandbox.
 - ~~22 claves de la Sprint 5 sin traducir~~ resueltas en Sprint 7 T3.
 
-## Sprint 7 — Integración con el sistema y salida a tienda (en curso)
+## Sprint 7 — Integración con el sistema y salida a tienda (T1–T6 hechas; falta TestFlight y prueba en dispositivo)
 
 Decisiones (29/09/2026): **sin App Intents** (ni Atajos, ni Siri, ni Centro de
 Control) y **sin Share Extension** (exigiría App Group). Plan completo en
@@ -461,6 +461,36 @@ buscable y la contraseña, tal como está en el código. Sin código tocado.
 Falta: crear la app y los dos productos en App Store Connect, hacer las capturas
 con la app real y con documentos ficticios (las hace Raúl), y responder el
 cuestionario de clasificación por edad (se propone 4+).
+
+### T6 — Checklist de App Review (§12) ✅ revisión / ⏳ lo que solo puede hacer Raúl
+Compilación **Release para dispositivo** (`generic/platform=iOS`, sin firmar): sin
+warnings ni errores; el bundle lleva `PrivacyInfo.xcprivacy`, icono, `Assets.car`,
+`es.lproj` y `en.lproj`, iOS mínimo 18.0, iPhone + iPad.
+
+| Punto | Resultado |
+|---|---|
+| **3.1.2** paywall | ✅ Precio visible antes de comprar (`displayPrice`), texto de renovación con las 24 h, restaurar compras, botón Cerrar, enlaces a términos y privacidad (ya reales y con 200). Sin cuenta atrás ni «oferta que expira» (grep). Sin productos (offline) muestra `unavailablePlans`, no un spinner. |
+| **4.2** primera ejecución | ✅ Abre en la biblioteca con estado vacío; no hay registro ni onboarding; la cámara solo se pide al tocar escanear. |
+| **4.3** diferenciación | ✅ Ficha (T5) y nombre sin palabras clave. Solo Raúl puede juzgar el resultado. |
+| **5.1.1** privacidad | ✅ Sin `URLSession`/WebKit/Safari en todo el código. Manifiesto: `UserDefaults` `CA92.1` declarado y es la única API de motivo obligatorio en uso (grep de fechas de fichero, espacio libre y uptime: cero; `totalFileAllocatedSize` no está en la lista). Sin SDKs. Ficha en «Data Not Collected». |
+| **2.3** capturas | ⏳ Las hace Raúl con la app real (guion en `docs/appstore-listing.md`). |
+| Cámara denegada | ✅ Probado en simulador (Sprint 1). |
+| Sin espacio en disco | ⚠️ Solo por lectura de código: `createDocument` captura el fallo, borra el directorio a medio escribir y enseña el error. No probado. |
+| Modo avión | ✅ Por diseño: no hay red; Pro sale de caché y `currentEntitlements`. Sin probar con el interruptor real. |
+
+Decisiones de Raúl que no he tomado por él:
+- **`ITSAppUsesNonExemptEncryption`**: no está en `Info.plist`. La contraseña de PDF usa
+  el cifrado estándar del sistema (PDFKit), que normalmente cuenta como exento. Poner
+  `false` evita la pregunta en cada subida, pero es una declaración legal tuya.
+- **`NSPhotoLibraryAddUsageDescription`**: está declarada (HANDOFF §6) pero ningún código
+  guarda en Fotos (exportar va por `ShareLink`). No causa rechazo; se puede quitar o
+  dejar.
+- **Versión**: `MARKETING_VERSION 0.1.0`, build `1`. Para la primera versión pública
+  hace falta decidir si sale como `1.0.0`.
+
+Sigue sin hacerse (requiere cuenta o dispositivo de Raúl): archivar y subir a TestFlight,
+prueba en su iPhone y en el de otra persona (criterio de aceptación de la Sprint 7), y
+los pendientes de dispositivo listados más arriba.
 
 ## Decisiones cerradas (26/08/2026)
 
