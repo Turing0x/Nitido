@@ -113,6 +113,17 @@ struct SettingsView: View {
                 .font(DS.Typography.bodyText)
                 .listRowBackground(DS.ColorToken.card(scheme))
 
+                if let privacy = LegalLinks.privacyPolicy {
+                    Link(String(localized: "paywall.privacy", defaultValue: "Política de privacidad"), destination: privacy)
+                        .font(DS.Typography.bodyText)
+                        .listRowBackground(DS.ColorToken.card(scheme))
+                }
+                if let terms = LegalLinks.termsOfUse {
+                    Link(String(localized: "paywall.terms", defaultValue: "Términos de uso"), destination: terms)
+                        .font(DS.Typography.bodyText)
+                        .listRowBackground(DS.ColorToken.card(scheme))
+                }
+
                 Text(String(
                     localized: "settings.privacy.claim",
                     defaultValue: "Tus documentos no salen de este dispositivo: todo el procesado ocurre aquí y Nítido no los envía a ninguna parte. La única conexión que existe es la que hace el sistema con App Store cuando compras."

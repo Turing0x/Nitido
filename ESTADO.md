@@ -290,14 +290,15 @@ flag `ocrFailed`).
 - **Accesibilidad completa**, deliberadamente fuera de esta ronda: etiquetas
   de VoiceOver exhaustivas, verificación con tamaños de Dynamic Type de
   accesibilidad y con el inspector de accesibilidad.
-- Enlace real a política de privacidad (falta la URL).
+- ~~Enlace a política de privacidad~~ añadido en Ajustes.
 - Verificación en dispositivo físico de todo lo de esta sprint.
 
-## Sprint 6 — Monetización (sin verificar en Xcode)
+## Sprint 6 — Monetización (compila y tests en verde; ciclo StoreKit sin probar a mano)
 
-**Escrita entera en un contenedor Linux, sin Xcode ni toolchain de Swift: no
-está compilada ni ejecutada.** Todo lo de abajo necesita pasar por
-`xcodegen generate && xcodebuild … test` en el Mac antes de darlo por bueno.
+Escrita en un contenedor Linux y verificada después en el Mac (29/09/2026):
+`xcodegen generate && xcodebuild … test` compila sin warnings de Swift y
+pasa **98 tests en 19 suites, todos en verde**. Sigue sin probarse a mano el
+ciclo de compra en el simulador.
 
 ### Piezas nuevas (`Nitido/Purchases/`)
 
@@ -386,13 +387,12 @@ efectivamente no se puede buscar.
 
 ### Pendiente de la Sprint 6
 
-- **Compilar y pasar los tests en el Mac.** Nada de esto se ha ejecutado.
 - **Comprobación manual del ciclo completo**: comprar anual y vitalicio con el
   `.storekit`, cerrar, reinstalar, restaurar y recuperar Pro; agotar la cuota y
   ver que las páginas aplazadas vuelven solas.
-- **URLs reales de términos de uso y política de privacidad**
-  (`LegalLinks`, en `PaywallView.swift`, tiene marcadores de posición). App
-  Review rechaza cualquier paywall con suscripción que no enlace a las dos.
+- ~~URLs legales~~ hechas (29/09/2026): `LegalLinks` apunta a
+  `apps.threedotsdev.com/terms/nitido` y `/privacy/nitido`; Ajustes enlaza las
+  dos. **Falta comprobar que las páginas existen y cargan** antes de subir.
 - **Alta de los dos productos en App Store Connect** con los identificadores
   exactos, para poder probar en sandbox.
 - **22 claves de la Sprint 5 no están en el catálogo** (`trash.*`,

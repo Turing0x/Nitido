@@ -6,9 +6,8 @@ import SwiftUI
 /// App Review exige los dos en cualquier pantalla con suscripción
 /// auto-renovable, y los rechaza si no llevan a ninguna parte.
 enum LegalLinks {
-    // TODO: sustituir por las URL reales antes de subir a App Store.
-    static let termsOfUse = URL(string: "https://nitido.app/terminos")
-    static let privacyPolicy = URL(string: "https://nitido.app/privacidad")
+    static let termsOfUse = URL(string: "https://apps.threedotsdev.com/terms/nitido")
+    static let privacyPolicy = URL(string: "https://apps.threedotsdev.com/privacy/nitido")
 }
 
 struct PaywallView: View {
