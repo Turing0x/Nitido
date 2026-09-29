@@ -437,6 +437,21 @@ simulador con `-AppleLanguages (en)`: Ajustes y Papelera, todo en inglés. 99 te
 verde. Sin revisar pantalla a pantalla el resto de la app en inglés, ni la longitud
 de los textos ingleses en Dynamic Type grande (va con accesibilidad).
 
+### T4 — Icono y AccentColor ✅
+`Nitido/Assets.xcassets` con `AppIcon` (un solo PNG 1024, `icon-1024.png`) y
+`AccentColor` (emerald de `DesignTokens`, claro `h160 s84 l39` y oscuro `h152 s76
+l44`, convertidos a sRGB). Declarados en `project.yml`
+(`ASSETCATALOG_COMPILER_APPICON_NAME` / `..._GLOBAL_ACCENT_COLOR_NAME`).
+`icon.png` original de la raíz **tenía canal alfa** (App Store lo rechaza): el
+de la app es el mismo dibujo aplanado sobre blanco, sin alfa. El original queda
+en la raíz sin tocar y sin versionar. Verificado en simulador: el icono aparece
+en la pantalla de inicio. 99 tests en verde.
+Observaciones sobre el dibujo (decisión de Raúl, no se ha tocado): los colores
+(cian y amarillo) no son los emerald de la marca, y el marco del móvil llega al
+borde del lienzo, así que la máscara redondeada de iOS recorta un poco arriba y
+abajo. Además parece un icono de un paquete de iconos: comprobar que su licencia
+permite uso comercial en App Store y si exige atribución.
+
 ## Decisiones cerradas (26/08/2026)
 
 - **Cámara: VisionKit, sin discusión.** `VNDocumentCameraViewController` con su
