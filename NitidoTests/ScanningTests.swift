@@ -249,6 +249,26 @@ struct PageBatchProviderTests {
         #expect(delivered == 8)
     }
 
+    @Test("solo se borran los ficheros entrantes que están en Inbox")
+    @MainActor
+    func discardsOnlyInboxFiles() throws {
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        let inbox = root.appending(path: "Inbox")
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let incoming = inbox.appending(path: "a.pdf")
+        let elsewhere = root.appending(path: "b.pdf")
+        try TestFixtures.pdf(pageCount: 1).write(to: incoming)
+        try TestFixtures.pdf(pageCount: 1).write(to: elsewhere)
+
+        ScanCoordinator.discardIfInbox(incoming)
+        ScanCoordinator.discardIfInbox(elsewhere)
+
+        #expect(!FileManager.default.fileExists(atPath: incoming.path))
+        #expect(FileManager.default.fileExists(atPath: elsewhere.path))
+    }
+
     @Test("un PDF no pasa por la detección de bordes: ya viene encuadrado")
     func pdfSkipsDocumentDetection() throws {
         let url = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).pdf")

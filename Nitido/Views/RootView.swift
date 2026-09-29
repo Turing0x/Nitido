@@ -53,6 +53,11 @@ struct RootView: View {
             selectedTab = .documents
             router.openDocument(documentID)
         }
+        .onOpenURL { url in
+            // «Copiar a Nítido» desde otra app: entra como un documento más.
+            selectedTab = .documents
+            coordinator.receiveIncomingFile(url)
+        }
         .alert(
             String(localized: "startup.error.title", defaultValue: "No se pudo abrir el almacenamiento"),
             isPresented: $isShowingStartupError,

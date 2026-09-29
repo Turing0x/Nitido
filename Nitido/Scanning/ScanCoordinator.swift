@@ -35,6 +35,8 @@ final class ScanCoordinator {
     var errorMessage: String?
     private(set) var ocrProgress: [UUID: OCRProgress] = [:]
 
+    private var incomingFiles: [URL] = []
+    private var isDrainingIncomingFiles = false
     private let documentStore: DocumentStore
     private let fileStore: any FileStoring
     private let entitlements: Entitlements
@@ -182,6 +184,36 @@ final class ScanCoordinator {
                 phase = .idle
             }
         }
+    }
+
+    /// Ficheros que otras apps entregan con «Copiar a Nítido».
+    ///
+    /// iOS llama a `onOpenURL` una vez por fichero y sin esperar a que termine
+    /// la anterior. Importarlos a la vez lanzaría varias ingestas en paralelo
+    /// (memoria) y mezclaría `phase`, así que se encolan y se procesan de uno
+    /// en uno; cada fichero da su propio documento.
+    func receiveIncomingFile(_ url: URL) {
+        incomingFiles.append(url)
+        guard !isDrainingIncomingFiles else { return }
+        isDrainingIncomingFiles = true
+        Task {
+            while !incomingFiles.isEmpty {
+                let next = incomingFiles.removeFirst()
+                await importFromFiles(result: .success([next]))
+                // `provider(forFileAt:)` ya leyó el contenido entero, así que
+                // la copia de `Inbox` no hace falta y no debe acumularse.
+                Self.discardIfInbox(next)
+            }
+            isDrainingIncomingFiles = false
+        }
+    }
+
+    /// iOS copia los ficheros entrantes a `Documents/Inbox` (no se abren en el
+    /// sitio: `LSSupportsOpeningDocumentsInPlace` está a `false`). Solo se
+    /// borra lo que está ahí; una URL de cualquier otro sitio no es nuestra.
+    nonisolated static func discardIfInbox(_ url: URL) {
+        guard url.isFileURL, url.deletingLastPathComponent().lastPathComponent == "Inbox" else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     /// Traduce el fallo que devuelve VisionKit.

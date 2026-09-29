@@ -401,6 +401,22 @@ efectivamente no se puede buscar.
   sprint, pero significan que una instalación en inglés las enseña en español.
   Las de la Sprint 6 sí van con español e inglés.
 
+## Sprint 7 — Integración con el sistema y salida a tienda (en curso)
+
+Decisiones (29/09/2026): **sin App Intents** (ni Atajos, ni Siri, ni Centro de
+Control) y **sin Share Extension** (exigiría App Group). Plan completo en
+tareas T1–T6.
+
+### T1 — «Copiar a Nítido» ✅
+`CFBundleDocumentTypes` (PDF e imagen, rango `Alternate`, no en el sitio) en
+`Info.plist`; `RootView.onOpenURL` → `ScanCoordinator.receiveIncomingFile`, que
+encola los ficheros y los importa de uno en uno (un documento por fichero) y
+borra la copia de `Inbox` al acabar (`discardIfInbox`, solo si está en `Inbox`).
+99 tests en verde. Verificado en el simulador: PDF de 2 páginas desde Archivos →
+Compartir → Nítido → documento nuevo abierto y OCR en marcha.
+Límite conocido: desde Fotos no aparece Nítido para imágenes (Fotos usa su
+propia fila de apps); cubre Archivos, Mail, Safari, etc.
+
 ## Decisiones cerradas (26/08/2026)
 
 - **Cámara: VisionKit, sin discusión.** `VNDocumentCameraViewController` con su
