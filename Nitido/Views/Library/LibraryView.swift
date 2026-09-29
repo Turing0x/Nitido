@@ -186,7 +186,7 @@ struct LibraryView: View {
                  ? String(localized: "library.noResults.description",
                           defaultValue: "Prueba con otra palabra.")
                  : String(localized: "library.empty.description",
-                          defaultValue: "Escanea tu primer documento. Todo se procesa en este iPhone."))
+                          defaultValue: "Escanea tu primer documento. Todo se procesa en este dispositivo."))
             .font(DS.Typography.calloutText)
             .foregroundStyle(DS.ColorToken.mutedForeground(scheme))
         }

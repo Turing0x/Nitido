@@ -395,11 +395,7 @@ efectivamente no se puede buscar.
   dos. **Falta comprobar que las páginas existen y cargan** antes de subir.
 - **Alta de los dos productos en App Store Connect** con los identificadores
   exactos, para poder probar en sandbox.
-- **22 claves de la Sprint 5 no están en el catálogo** (`trash.*`,
-  `settings.trash`, `settings.scanning`, `settings.ocrLanguage`,
-  `library.select`, `page.ocrFailed.retry`, `common.done`…). No son de esta
-  sprint, pero significan que una instalación en inglés las enseña en español.
-  Las de la Sprint 6 sí van con español e inglés.
+- ~~22 claves de la Sprint 5 sin traducir~~ resueltas en Sprint 7 T3.
 
 ## Sprint 7 — Integración con el sistema y salida a tienda (en curso)
 
@@ -429,6 +425,17 @@ iPhone. **Sin probar**: giro a horizontal (el simulador no lo permite desde aqu�
 editor de página y exportación en iPad.
 Pendiente menor: el estado vacío dice «este iPhone» también en iPad
 (`library.empty`); se resuelve en T3.
+
+### T3 — Localización ES/EN ✅
+Catálogo al día: 22 claves de la Sprint 5 añadidas (es + en), las 20 de
+`page.*`/`pageEditor.*` completadas en inglés, 4 huérfanas borradas. Las claves con
+número usan `%lld`/`%@`. `InfoPlist.xcstrings` nuevo (nombre y dos textos de
+permiso, es/en; se compila a `InfoPlist.strings` por idioma). El estado vacío de la
+biblioteca dice «este dispositivo» en vez de «este iPhone». `Scripts/audit-strings.py`
+compara las claves del código con el catálogo y falla si falta es o en. Verificado en
+simulador con `-AppleLanguages (en)`: Ajustes y Papelera, todo en inglés. 99 tests en
+verde. Sin revisar pantalla a pantalla el resto de la app en inglés, ni la longitud
+de los textos ingleses en Dynamic Type grande (va con accesibilidad).
 
 ## Decisiones cerradas (26/08/2026)
 

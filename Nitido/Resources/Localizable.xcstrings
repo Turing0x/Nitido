@@ -52,6 +52,23 @@
         }
       }
     },
+    "common.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hecho"
+          }
+        }
+      }
+    },
     "common.more": {
       "extractionState": "manual",
       "localizations": {
@@ -558,40 +575,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Compresión"
-          }
-        }
-      }
-    },
-    "export.empty.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Export options arrive in Sprint 4."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las opciones de exportación llegan en la Sprint 4."
-          }
-        }
-      }
-    },
-    "export.empty.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Export"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exportar"
           }
         }
       }
@@ -1401,13 +1384,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scan your first document. Everything is processed on this iPhone."
+            "value": "Scan your first document. Everything is processed on this device."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escanea tu primer documento. Todo se procesa en este iPhone."
+            "value": "Escanea tu primer documento. Todo se procesa en este dispositivo."
           }
         }
       }
@@ -1582,6 +1565,40 @@
         }
       }
     },
+    "library.select": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seleccionar"
+          }
+        }
+      }
+    },
+    "library.selection.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld selected"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld seleccionados"
+          }
+        }
+      }
+    },
     "library.selection.export": {
       "extractionState": "manual",
       "localizations": {
@@ -1668,44 +1685,68 @@
       }
     },
     "page.delete": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete page"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Eliminar página"
           }
         }
       }
     },
     "page.delete.confirm": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete page"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Eliminar página"
           }
         }
       }
     },
     "page.delete.message": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This removes the page and its images."
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Esta acción elimina la página y sus imágenes."
           }
         }
       }
     },
     "page.delete.title": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete page?"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "¿Eliminar página?"
           }
         }
@@ -1728,189 +1769,256 @@
         }
       }
     },
-    "page.reorder": {
-      "extractionState": "extracted_with_value",
+    "page.ocrFailed.retry": {
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text could not be recognized. Tap to retry."
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
+            "value": "No se pudo reconocer el texto. Toca para reintentar."
+          }
+        }
+      }
+    },
+    "page.reorder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reorder pages"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
             "value": "Reordenar páginas"
           }
         }
       }
     },
     "page.reorder.done": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done reordering"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Terminar de reordenar"
           }
         }
       }
     },
     "pageEditor.crop": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crop"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Recorte"
           }
         }
       }
     },
     "pageEditor.documentIntensity": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intensity"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Intensidad"
           }
         }
       }
     },
     "pageEditor.dragHandleHint": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to adjust the crop"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Arrastra para ajustar el recorte"
           }
         }
       }
     },
-    "pageEditor.empty.description": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cropping, filters and rotation arrive in Sprint 2."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Recorte, filtros y rotación llegan en la Sprint 2."
-          }
-        }
-      }
-    },
-    "pageEditor.empty.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Edit page"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Editar página"
-          }
-        }
-      }
-    },
     "pageEditor.handle.bottomLeft": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bottom left corner"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Esquina inferior izquierda"
           }
         }
       }
     },
     "pageEditor.handle.bottomRight": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bottom right corner"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Esquina inferior derecha"
           }
         }
       }
     },
     "pageEditor.handle.topLeft": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top left corner"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Esquina superior izquierda"
           }
         }
       }
     },
     "pageEditor.handle.topRight": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top right corner"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Esquina superior derecha"
           }
         }
       }
     },
     "pageEditor.imageUnavailable.title": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not open the image"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "No se pudo abrir la imagen"
           }
         }
       }
     },
     "pageEditor.improve": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enhance"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Mejora"
           }
         }
       }
     },
     "pageEditor.loading": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing page…"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Preparando página…"
           }
         }
       }
     },
     "pageEditor.missing.title": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page unavailable"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Página no disponible"
           }
         }
       }
     },
     "pageEditor.mode": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tool"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Herramienta"
           }
         }
@@ -1934,22 +2042,34 @@
       }
     },
     "pageEditor.resetCrop": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Restablecer"
           }
         }
       }
     },
     "pageEditor.rotate": {
-      "extractionState": "extracted_with_value",
+      "extractionState": "manual",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rotate"
+          }
+        },
         "es": {
           "stringUnit": {
-            "state": "new",
+            "state": "translated",
             "value": "Girar"
           }
         }
@@ -2907,6 +3027,108 @@
         }
       }
     },
+    "settings.defaultFilter": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default filter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtro por defecto"
+          }
+        }
+      }
+    },
+    "settings.exportQuality": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export quality"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calidad de exportación"
+          }
+        }
+      }
+    },
+    "settings.ocrLanguage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OCR language"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma del OCR"
+          }
+        }
+      }
+    },
+    "settings.ocrLanguage.automatic": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automático"
+          }
+        }
+      }
+    },
+    "settings.ocrLanguage.english": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inglés"
+          }
+        }
+      }
+    },
+    "settings.ocrLanguage.spanish": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spanish"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Español"
+          }
+        }
+      }
+    },
     "settings.privacy.claim": {
       "extractionState": "manual",
       "localizations": {
@@ -3026,6 +3248,57 @@
         }
       }
     },
+    "settings.regenerateThumbnails": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regenerate thumbnails"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regenerar miniaturas"
+          }
+        }
+      }
+    },
+    "settings.regenerateThumbnails.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld done"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld hechas"
+          }
+        }
+      }
+    },
+    "settings.scanning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scanning and export"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escaneo y exportación"
+          }
+        }
+      }
+    },
     "settings.storage": {
       "extractionState": "manual",
       "localizations": {
@@ -3090,6 +3363,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajustes"
+          }
+        }
+      }
+    },
+    "settings.trash": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Papelera"
           }
         }
       }
@@ -3226,6 +3516,142 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajustes"
+          }
+        }
+      }
+    },
+    "trash.deleteForever": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete permanently"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar definitivamente"
+          }
+        }
+      }
+    },
+    "trash.deleteForever.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This cannot be undone: the document and its pages are deleted for good."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta acción no se puede deshacer: el documento y sus páginas se borran del todo."
+          }
+        }
+      }
+    },
+    "trash.deleteForever.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete permanently?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar definitivamente?"
+          }
+        }
+      }
+    },
+    "trash.deletedAt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted on %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminado el %@"
+          }
+        }
+      }
+    },
+    "trash.empty.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documents you move to the trash stay here for 30 days."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los documentos que muevas a la papelera aparecen aquí durante 30 días."
+          }
+        }
+      }
+    },
+    "trash.empty.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The trash is empty"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La papelera está vacía"
+          }
+        }
+      }
+    },
+    "trash.restore": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar"
+          }
+        }
+      }
+    },
+    "trash.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trash"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Papelera"
           }
         }
       }
